@@ -259,6 +259,8 @@ export function AdminInspectModal({
               <div className="flex-1">
                 {activeFile && (
                   <Editor
+                    key={activeFile.filename}
+                    path={activeFile.filename}
                     height="100%"
                     language={activeFile.filename.endsWith(".js") ? "javascript" : activeFile.filename.endsWith(".css") ? "css" : "html"}
                     value={activeFile.content}

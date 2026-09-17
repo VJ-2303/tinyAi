@@ -275,10 +275,9 @@ export default function WorkspacePage() {
   // --------------------------------------------------------------------------
   const activeFile = files.find((f) => f.filename === activeFilename) || files[0] || null;
 
-  const handleUpdateFileContent = (newContent: string) => {
-    if (!activeFile) return;
+  const handleUpdateFileContent = (filename: string, newContent: string) => {
     setFiles((prev) =>
-      prev.map((f) => (f.filename === activeFile.filename ? { ...f, content: newContent } : f))
+      prev.map((f) => (f.filename === filename ? { ...f, content: newContent } : f))
     );
   };
 

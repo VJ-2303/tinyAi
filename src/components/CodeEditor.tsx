@@ -10,7 +10,7 @@ interface CodeEditorProps {
   files: FileRecord[];
   savedFiles?: FileRecord[];
   onSelectFile: (filename: string) => void;
-  onChangeContent: (newContent: string) => void;
+  onChangeContent: (filename: string, newContent: string) => void;
   onSaveAndRun: () => void;
   isLocked: boolean;
   lockReason?: string;
@@ -151,12 +151,14 @@ export function CodeEditor({
       <div className="flex-1 relative">
         {activeFile ? (
           <Editor
+            key={activeFile.filename}
+            path={activeFile.filename}
             height="100%"
             language={getLanguage(activeFile.filename)}
             value={activeFile.content}
-            theme="vs-dark"
+            theme="tinyai-dark"
             onMount={handleEditorMount}
-            onChange={(val) => onChangeContent(val || "")}
+            onChange={(val) => onChangeContent(activeFile.filename, val || "")}
             options={{
               fontSize: 13,
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
