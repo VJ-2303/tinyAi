@@ -115,24 +115,22 @@ export default function WorkspacePage() {
         };
       });
 
-      // If team is active, poll strike & lock status without overwriting in-editor files
-      if (teamId) {
-        const teamRes = await fetch(`/api/teams/${teamId}/files`);
+      // Only poll team status if workstation is currently locked (to detect organizer unlock)
+      if (teamId && team?.is_locked) {
+        const teamRes = await fetch(`/api/teams/${teamId}`);
         if (teamRes.ok) {
-          const filesData = await teamRes.json();
-          if (filesData.team) {
-            setTeam((prev) => {
-              if (!prev) return null;
-              if (
-                prev.strike_count === filesData.team.strike_count &&
-                prev.is_locked === filesData.team.is_locked &&
-                prev.prompt_count === filesData.team.prompt_count
-              ) {
-                return prev;
-              }
-              return { ...prev, ...filesData.team };
-            });
-          }
+          const teamData = await teamRes.json();
+          setTeam((prev) => {
+            if (!prev) return null;
+            if (
+              prev.strike_count === teamData.strike_count &&
+              prev.is_locked === teamData.is_locked &&
+              prev.prompt_count === teamData.prompt_count
+            ) {
+              return prev;
+            }
+            return { ...prev, ...teamData };
+          });
         }
       }
     } catch (err) {
@@ -140,7 +138,7 @@ export default function WorkspacePage() {
     } finally {
       isPollingRef.current = false;
     }
-  }, [teamId]);
+  }, [teamId, team?.is_locked]);
 
   useEffect(() => {
     fetchStatus();
