@@ -83,35 +83,64 @@ export default function WorkspacePage() {
     }
   }, [joinTeam]);
 
+  // Polling guard
+  const isPollingRef = useRef(false);
+
   // --------------------------------------------------------------------------
   // 2. State Synchronization Short Polling (every 2.5s)
   // --------------------------------------------------------------------------
+  const teamId = team?.id;
+
   const fetchStatus = useCallback(async () => {
+    if (isPollingRef.current) return;
+    isPollingRef.current = true;
+
     try {
       const res = await fetch("/api/competition/status");
       if (!res.ok) return;
       const data = await res.json();
 
-      setCompetition({
-        status: data.status,
-        remaining_seconds: data.remaining_seconds,
-        tasks: data.tasks || [],
+      setCompetition((prev) => {
+        if (
+          prev.status === data.status &&
+          prev.remaining_seconds === data.remaining_seconds &&
+          prev.tasks.length === (data.tasks?.length || 0)
+        ) {
+          return prev;
+        }
+        return {
+          status: data.status,
+          remaining_seconds: data.remaining_seconds,
+          tasks: data.tasks || [],
+        };
       });
 
       // If team is active, poll strike & lock status without overwriting in-editor files
-      if (team) {
-        const teamRes = await fetch(`/api/teams/${team.id}/files`);
+      if (teamId) {
+        const teamRes = await fetch(`/api/teams/${teamId}/files`);
         if (teamRes.ok) {
           const filesData = await teamRes.json();
           if (filesData.team) {
-            setTeam((prev) => (prev ? { ...prev, ...filesData.team } : prev));
+            setTeam((prev) => {
+              if (!prev) return null;
+              if (
+                prev.strike_count === filesData.team.strike_count &&
+                prev.is_locked === filesData.team.is_locked &&
+                prev.prompt_count === filesData.team.prompt_count
+              ) {
+                return prev;
+              }
+              return { ...prev, ...filesData.team };
+            });
           }
         }
       }
     } catch (err) {
       console.error("Status polling failed:", err);
+    } finally {
+      isPollingRef.current = false;
     }
-  }, [team]);
+  }, [teamId]);
 
   useEffect(() => {
     fetchStatus();

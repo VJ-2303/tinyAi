@@ -1,7 +1,7 @@
-# Prompt Under Pressure — Platform Implementation Plan (Refined)
+# Tiny AI, Big Brain — Platform Implementation Plan (Refined)
 
 ## 1. Overview
-Custom web platform for the **Prompt Under Pressure** live hackathon:
+Custom web platform for the **Tiny AI, Big Brain** live hackathon:
 - Teams of 2 build an HTML game from scratch on 1 shared workstation.
 - Teams prompt a weak (<1B) local LLM served via vLLM (OpenAI-compatible endpoint).
 - Strict proctoring: Enforced fullscreen + tab switch / focus-loss detection with a 3-strike lockout policy.

@@ -62,7 +62,7 @@ export function CodeEditor({
     editorRef.current = editor;
 
     // Define custom dark utilitarian theme
-    monaco.editor.defineTheme("pup-dark", {
+    monaco.editor.defineTheme("tinyai-dark", {
       base: "vs-dark",
       inherit: true,
       rules: [
@@ -81,7 +81,7 @@ export function CodeEditor({
         "editorWhitespace.foreground": "#27272a",
       },
     });
-    monaco.editor.setTheme("pup-dark");
+    monaco.editor.setTheme("tinyai-dark");
   };
 
   return (

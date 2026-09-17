@@ -75,7 +75,7 @@ export function AdminHeader({
         <div className="flex items-center space-x-2 font-mono">
           <div className="w-2.5 h-2.5 bg-zinc-100 rotate-45" />
           <span className="text-xs font-bold text-zinc-100 tracking-wider">
-            ADMIN // COMMAND CENTER
+            TINY AI, BIG BRAIN // ADMIN
           </span>
         </div>
         {getStatusBadge()}

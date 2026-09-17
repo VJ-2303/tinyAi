@@ -34,14 +34,14 @@ export function JoinModal({ onJoin }: JoinModalProps) {
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-lg p-6 shadow-2xl">
         <div className="flex items-center space-x-2 text-zinc-400 text-xs font-mono mb-3">
           <Terminal className="w-4 h-4 text-zinc-300" />
-          <span>PROMPT UNDER PRESSURE // LIVE HACKATHON</span>
+          <span>TINY AI, BIG BRAIN</span>
         </div>
 
         <h1 className="text-xl font-bold text-zinc-100 tracking-tight mb-1">
           Workstation Registration
         </h1>
         <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
-          Enter your team name to access the code environment. One shared workstation per team of 2.
+          Enter your team name to access the code environment.
         </p>
 
         {error && (
@@ -65,13 +65,6 @@ export function JoinModal({ onJoin }: JoinModalProps) {
               disabled={loading}
               className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-zinc-400 font-mono transition-colors"
             />
-          </div>
-
-          <div className="bg-zinc-950/60 border border-zinc-800/80 rounded p-3 text-[11px] text-zinc-400 space-y-1">
-            <div className="font-semibold text-zinc-300">Rules in brief:</div>
-            <div>• All code and prompts are locked until organizer starts the event.</div>
-            <div>• Fullscreen enforced during active sprint; tab-switches count strikes.</div>
-            <div>• Build completely from scratch; prompts to weak AI are tracked.</div>
           </div>
 
           <button

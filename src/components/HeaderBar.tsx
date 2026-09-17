@@ -70,7 +70,7 @@ export function HeaderBar({
         <div className="flex items-center space-x-2">
           <div className="w-2.5 h-2.5 bg-zinc-200 rotate-45" />
           <span className="font-mono text-xs font-semibold text-zinc-100 tracking-wider">
-            TINYAI // PUP
+            TINY AI // BIG BRAIN
           </span>
         </div>
         {getStatusBadge()}

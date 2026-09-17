@@ -24,7 +24,7 @@ export function PreviewPanel({ files, runTrigger }: PreviewPanelProps) {
   // Catch errors sent from inside the iframe via window.postMessage
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === "PUP_PREVIEW_ERROR") {
+      if (e.data && e.data.type === "TINYAI_PREVIEW_ERROR") {
         setErrors((prev) => [
           ...prev.slice(-9), // keep last 10 errors max
           {
@@ -61,7 +61,7 @@ export function PreviewPanel({ files, runTrigger }: PreviewPanelProps) {
   window.onerror = function(msg, url, lineNo, columnNo, error) {
     try {
       window.parent.postMessage({
-        type: 'PUP_PREVIEW_ERROR',
+        type: 'TINYAI_PREVIEW_ERROR',
         message: msg ? msg.toString() : 'Runtime Error',
         filename: url ? url.split('/').pop() : '',
         lineno: lineNo
