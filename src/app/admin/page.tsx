@@ -106,16 +106,34 @@ export default function AdminPage() {
         const teamsData = await teamsRes.json();
         setTeams(teamsData.teams || []);
       }
-    } catch (err) {
-      console.error("Dashboard poll failed:", err);
+    } catch (err: unknown) {
+      const isTransient =
+        err instanceof TypeError &&
+        (err.message.includes("Failed to fetch") ||
+          err.message.includes("NetworkError") ||
+          err.message.includes("Load failed"));
+
+      if (!isTransient) {
+        console.warn("Dashboard poll issue:", err);
+      }
     }
   }, [adminPin, adminFetch]);
 
   useEffect(() => {
     if (!adminPin) return;
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 2500);
-    return () => clearInterval(interval);
+    let isMounted = true;
+
+    const poll = async () => {
+      if (!isMounted) return;
+      await fetchDashboardData();
+    };
+
+    poll();
+    const interval = setInterval(poll, 2500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [adminPin, fetchDashboardData]);
 
   // 3. Competition Controls

@@ -133,17 +133,36 @@ export default function WorkspacePage() {
           });
         }
       }
-    } catch (err) {
-      console.error("Status polling failed:", err);
+    } catch (err: unknown) {
+      // Ignore transient network blips, server restarts, or offline hiccups during background polling
+      const isTransient =
+        err instanceof TypeError &&
+        (err.message.includes("Failed to fetch") ||
+          err.message.includes("NetworkError") ||
+          err.message.includes("Load failed"));
+
+      if (!isTransient) {
+        console.warn("Status polling issue:", err);
+      }
     } finally {
       isPollingRef.current = false;
     }
   }, [teamId, team?.is_locked]);
 
   useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 2500);
-    return () => clearInterval(interval);
+    let isMounted = true;
+
+    const poll = async () => {
+      if (!isMounted) return;
+      await fetchStatus();
+    };
+
+    poll();
+    const interval = setInterval(poll, 2500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [fetchStatus]);
 
   // --------------------------------------------------------------------------
