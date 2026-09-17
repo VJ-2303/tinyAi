@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npm run test:db && npm run test:api && npm run test:e2e",
     "test:db": "tsx --test tests/db.test.ts",
-    "test:api": "tsx --test tests/api.test.ts"
+    "test:api": "tsx --test tests/api.test.ts",
+    "test:e2e": "tsx --test tests/e2e-simulation.test.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.20",

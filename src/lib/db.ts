@@ -67,7 +67,11 @@ function initDatabase(): DatabaseSync {
 
   // Performance and integrity pragmas
   db.exec("PRAGMA busy_timeout = 10000;");
-  db.exec("PRAGMA journal_mode = WAL;");
+  try {
+    db.exec("PRAGMA journal_mode = WAL;");
+  } catch {
+    // WAL mode may already be active or locked by concurrent worker
+  }
   db.exec("PRAGMA foreign_keys = ON;");
 
   // 1. competition_state table
