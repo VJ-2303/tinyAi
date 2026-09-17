@@ -110,7 +110,7 @@ export function LeftPanel({
                 <ListTodo className="w-6 h-6 mx-auto text-zinc-700 stroke-1" />
                 <p>No tasks revealed yet.</p>
                 <p className="text-[11px] text-zinc-600">
-                  Organizers reveal incremental twists during the sprint.
+                  Tasks will appear here when released by event organizers.
                 </p>
               </div>
             ) : (

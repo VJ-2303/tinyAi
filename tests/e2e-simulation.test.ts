@@ -225,7 +225,7 @@ describe("Full Event Lifecycle End-to-End Simulation", () => {
       assert.equal(promptRes.status, 200);
       const data = await promptRes.json();
       assert.equal(data.prompt_count, 1);
-      assert.match(data.message.content, /vLLM Offline Fallback Mode/);
+      assert.match(data.message.content, /vLLM Offline Mode/);
 
       // Immediate second prompt triggers 429 Cooldown
       const spamReq = new NextRequest(`http://localhost:3000/api/teams/${team1Id}/chat`, {

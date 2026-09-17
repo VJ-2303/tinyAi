@@ -68,7 +68,7 @@ export function ProctoringOverlay({
               Fullscreen Required
             </h2>
             <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-              The organizer has started the event timer. Enter fullscreen mode to begin coding and accessing the AI assistant.
+              The organizer has started the event timer. Enter fullscreen mode to begin coding and accessing the workstation.
             </p>
           </div>
 

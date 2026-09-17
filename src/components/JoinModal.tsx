@@ -61,7 +61,7 @@ export function JoinModal({ onJoin }: JoinModalProps) {
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. VelocityDevs"
+              placeholder="Enter team name..."
               disabled={loading}
               className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700 rounded text-sm text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-zinc-400 font-mono transition-colors"
             />

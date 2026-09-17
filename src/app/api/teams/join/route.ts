@@ -55,28 +55,25 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`;
 
-      const defaultJs = `// ${team.name} - Game Script
-const canvas = document.getElementById('gameCanvas');
+      const defaultJs = `const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  draw();
-}
+let width = (canvas.width = window.innerWidth);
+let height = (canvas.height = window.innerHeight);
 
-function draw() {
+window.addEventListener('resize', () => {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+});
+
+function loop() {
   ctx.fillStyle = '#09090b';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  ctx.fillStyle = '#a1a1aa';
-  ctx.font = '16px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('Game Canvas Ready', canvas.width / 2, canvas.height / 2);
+  ctx.fillRect(0, 0, width, height);
+
+  requestAnimationFrame(loop);
 }
 
-window.addEventListener('resize', resize);
-resize();
+requestAnimationFrame(loop);
 `;
 
       upsertFile(team.id, "index.html", defaultHtml);

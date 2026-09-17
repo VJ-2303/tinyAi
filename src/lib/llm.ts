@@ -87,10 +87,9 @@ export async function queryVLLM(messages: ChatMessage[]): Promise<string> {
     if (errMsg.includes("fetch failed") || errMsg.includes("ECONNREFUSED") || errMsg.includes("timeout")) {
       const latestUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
       return (
-        `[vLLM Offline Fallback Mode]\n` +
-        `Note: Local vLLM server at ${baseUrl} is currently offline or unreachable.\n\n` +
-        `Echoing advice for: "${latestUserMsg.slice(0, 80)}..."\n\n` +
-        `\`\`\`javascript\n// Game helper example\nfunction update() {\n  // Implement core mechanic here\n}\n\`\`\``
+        `[vLLM Offline Mode] LLM server at ${baseUrl} is unreachable.\n\n` +
+        `Prompt received: "${latestUserMsg.slice(0, 100)}"\n\n` +
+        `Start the local vLLM server to generate live responses.`
       );
     }
 

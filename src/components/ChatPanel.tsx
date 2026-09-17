@@ -147,7 +147,7 @@ export function ChatPanel({
       <div className="h-9 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center space-x-2 text-xs font-mono text-zinc-300">
           <span className="font-semibold text-zinc-200 uppercase tracking-wider text-[11px]">
-            AI Assistant (&lt;1B LLM)
+            AI TERMINAL // &lt;1B MODEL
           </span>
         </div>
         <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-800">
@@ -158,11 +158,8 @@ export function ChatPanel({
       {/* Messages list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {history.length === 0 ? (
-          <div className="py-12 px-4 text-center text-zinc-500 text-xs space-y-1.5 font-mono">
-            <p className="font-medium text-zinc-300">Ask coding or syntax questions</p>
-            <p className="text-[11px] text-zinc-600 max-w-xs mx-auto">
-              Weak models cannot reason multi-step architecture. Ask for small, self-contained functions or math logic.
-            </p>
+          <div className="h-full flex items-center justify-center text-zinc-600 text-xs font-mono">
+            <span>Terminal ready. Send a prompt to query model.</span>
           </div>
         ) : (
           history.map((msg, idx) => {
@@ -180,7 +177,7 @@ export function ChatPanel({
                   }`}
                 >
                   <div className="text-[10px] font-mono text-zinc-500 mb-1 uppercase tracking-wider font-semibold">
-                    {isUser ? "Team" : "Assistant"}
+                    {isUser ? "PROMPT" : "MODEL"}
                   </div>
                   {isUser ? msg.content : renderMessageContent(msg.content, idx)}
                 </div>
@@ -192,7 +189,7 @@ export function ChatPanel({
         {isSending && (
           <div className="flex items-center space-x-2 text-xs text-zinc-400 font-mono py-1">
             <span className="w-2 h-2 rounded-full bg-zinc-500 animate-pulse" />
-            <span className="text-[11px] animate-pulse">Assistant generating response...</span>
+            <span className="text-[11px] animate-pulse">Querying model...</span>
           </div>
         )}
 
@@ -217,10 +214,10 @@ export function ChatPanel({
             }}
             placeholder={
               isLocked
-                ? lockReason || "Chat locked"
+                ? lockReason || "Terminal locked"
                 : cooldownRemaining > 0
                 ? `Cooldown active: ${cooldownRemaining}s remaining...`
-                : "Ask for code or math logic (Enter to send, Shift+Enter for newline)..."
+                : "Enter prompt query (Enter to send, Shift+Enter for newline)..."
             }
             disabled={isLocked || isSending || cooldownRemaining > 0}
             className="w-full pl-2.5 pr-20 py-2 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-100 placeholder-zinc-600 focus:outline-hidden focus:border-zinc-500 font-mono resize-none disabled:opacity-50 disabled:cursor-not-allowed"

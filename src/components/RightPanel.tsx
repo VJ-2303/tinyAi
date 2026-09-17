@@ -56,7 +56,7 @@ export function RightPanel({
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
-            <span>AI Chat</span>
+            <span>AI Terminal</span>
             <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-300">
               {promptCount}
             </span>
