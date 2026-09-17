@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Users, Eye, Unlock, ShieldAlert, Award } from "lucide-react";
 import type { Team } from "@/lib/db";
 
@@ -15,6 +15,29 @@ export function AdminTeamTable({
   onInspectTeam,
   onUnlockTeam,
 }: AdminTeamTableProps) {
+  const [unlockingTeamId, setUnlockingTeamId] = useState<string | null>(null);
+  const [inspectingTeamId, setInspectingTeamId] = useState<string | null>(null);
+
+  const handleReset = async (teamId: string, teamName: string) => {
+    if (confirm(`Reset strikes and unlock workstation for "${teamName}"?`)) {
+      setUnlockingTeamId(teamId);
+      try {
+        await onUnlockTeam(teamId);
+      } finally {
+        setUnlockingTeamId(null);
+      }
+    }
+  };
+
+  const handleInspect = async (teamId: string) => {
+    setInspectingTeamId(teamId);
+    try {
+      await onInspectTeam(teamId);
+    } finally {
+      setInspectingTeamId(null);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-zinc-950 overflow-hidden select-none">
       {/* Header */}
@@ -60,6 +83,8 @@ export function AdminTeamTable({
               {teams.map((t, idx) => {
                 const isLocked = Boolean(t.is_locked);
                 const hasStrikes = t.strike_count > 0;
+                const isUnlocking = unlockingTeamId === t.id;
+                const isInspecting = inspectingTeamId === t.id;
 
                 return (
                   <tr
@@ -95,7 +120,7 @@ export function AdminTeamTable({
                     </td>
 
                     <td className="py-2.5 px-3 text-zinc-400">
-                      {t.file_count} files
+                      {t.file_count} file{t.file_count === 1 ? "" : "s"}
                     </td>
 
                     <td className="py-2.5 px-3">
@@ -112,21 +137,23 @@ export function AdminTeamTable({
                     <td className="py-2.5 px-3 text-right space-x-1.5">
                       {hasStrikes && (
                         <button
-                          onClick={() => onUnlockTeam(t.id)}
+                          onClick={() => handleReset(t.id, t.name)}
+                          disabled={isUnlocking}
                           title="Reset Strikes & Unlock"
-                          className="px-2 py-1 bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-800 rounded text-[10px] cursor-pointer"
+                          className="px-2 py-1 bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-800 rounded text-[10px] cursor-pointer disabled:opacity-40"
                         >
                           <Unlock className="w-3 h-3 inline mr-1" />
-                          <span>Reset</span>
+                          <span>{isUnlocking ? "Resetting..." : "Reset"}</span>
                         </button>
                       )}
 
                       <button
-                        onClick={() => onInspectTeam(t.id)}
-                        className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded text-[10px] font-medium transition-colors cursor-pointer"
+                        onClick={() => handleInspect(t.id)}
+                        disabled={isInspecting}
+                        className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded text-[10px] font-medium transition-colors cursor-pointer disabled:opacity-40"
                       >
                         <Eye className="w-3 h-3 inline mr-1" />
-                        <span>Inspect</span>
+                        <span>{isInspecting ? "Loading..." : "Inspect"}</span>
                       </button>
                     </td>
                   </tr>

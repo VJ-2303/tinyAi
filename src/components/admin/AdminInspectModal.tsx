@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { X, Play, Code, MessageSquare, AlertTriangle, RotateCw, Copy, Check, Unlock, ExternalLink } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import type { Team, FileRecord, PromptRecord, Violation } from "@/lib/db";
@@ -28,6 +28,17 @@ export function AdminInspectModal({
   const [copied, setCopied] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
 
+  // Close modal on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // Bundle files for live playable game iframe
   const bundledHtml = useMemo(() => {
     const indexHtml = files.find((f) => f.filename === "index.html")?.content || "<h3>No index.html</h3>";
@@ -35,6 +46,38 @@ export function AdminInspectModal({
     const jsFiles = files.filter((f) => f.filename.endsWith(".js"));
 
     const combinedCss = cssFiles.map((f) => f.content).join("\n");
+
+    const errorCatcherScript = `
+<script>
+  window.onerror = function(msg, url, lineNo) {
+    try {
+      var banner = document.getElementById('tinyai-eval-error');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'tinyai-eval-error';
+        banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(127,29,29,0.95);color:#fca5a5;font-family:monospace;font-size:12px;padding:8px 12px;border-top:1px solid #ef4444;z-index:999999;word-break:break-word;';
+        document.body.appendChild(banner);
+      }
+      banner.innerHTML = '<strong>[Runtime Error' + (lineNo ? ' Line ' + lineNo : '') + ']:</strong> ' + String(msg);
+    } catch(e) {}
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function(event) {
+    try {
+      var reason = event.reason;
+      var msg = reason ? (reason.message || reason.toString()) : 'Unhandled Promise Rejection';
+      var banner = document.getElementById('tinyai-eval-error');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'tinyai-eval-error';
+        banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(127,29,29,0.95);color:#fca5a5;font-family:monospace;font-size:12px;padding:8px 12px;border-top:1px solid #ef4444;z-index:999999;word-break:break-word;';
+        document.body.appendChild(banner);
+      }
+      banner.innerHTML = '<strong>[Promise Rejection]:</strong> ' + String(msg);
+    } catch(e) {}
+  });
+</script>
+`;
 
     const canvasFullStyle = `
 <style>
@@ -82,7 +125,7 @@ export function AdminInspectModal({
       .map((f) => `/* ${f.filename} */\n${f.content}`)
       .join("\n");
 
-    const headInjections = `${canvasFullStyle}${remainingCss ? `\n<style>\n${remainingCss}\n</style>` : ""}`;
+    const headInjections = `${errorCatcherScript}\n${canvasFullStyle}${remainingCss ? `\n<style>\n${remainingCss}\n</style>` : ""}`;
 
     if (html.includes("<head>")) {
       html = html.replace("<head>", `<head>\n${headInjections}`);
@@ -111,9 +154,15 @@ export function AdminInspectModal({
 
   const handleCopyFileContent = () => {
     if (!activeFile) return;
-    navigator.clipboard.writeText(activeFile.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(activeFile.content)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => {});
+    }
   };
 
   const handleUnlock = async () => {
@@ -240,7 +289,7 @@ export function AdminInspectModal({
                   key={gameReloadKey}
                   title="Team Game"
                   srcDoc={bundledHtml}
-                  sandbox="allow-scripts allow-modals allow-same-origin"
+                  sandbox="allow-scripts allow-modals"
                   className="w-full h-full border-none"
                 />
               </div>
@@ -278,7 +327,11 @@ export function AdminInspectModal({
               </div>
 
               <div className="flex-1">
-                {activeFile && (
+                {files.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-zinc-500 font-mono text-xs">
+                    No files found for this team.
+                  </div>
+                ) : activeFile ? (
                   <Editor
                     key={activeFile.filename}
                     path={activeFile.filename}
@@ -293,7 +346,7 @@ export function AdminInspectModal({
                       scrollBeyondLastLine: false,
                     }}
                   />
-                )}
+                ) : null}
               </div>
             </div>
           )}
@@ -323,7 +376,7 @@ export function AdminInspectModal({
                         </span>
                         <span>{new Date(p.created_at).toLocaleTimeString()}</span>
                       </div>
-                      <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed select-text">
+                      <pre className="whitespace-pre-wrap break-words font-sans text-xs leading-relaxed select-text">
                         {p.content}
                       </pre>
                     </div>

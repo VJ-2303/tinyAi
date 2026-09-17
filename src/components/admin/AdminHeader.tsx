@@ -26,8 +26,13 @@ export function AdminHeader({
   onControlAction,
   onLogout,
 }: AdminHeaderProps) {
-  const [customDuration, setCustomDuration] = useState(durationMinutes || 120);
+  const [customDuration, setCustomDuration] = useState<string>(String(durationMinutes || 120));
   const [loadingAction, setLoadingAction] = useState(false);
+
+  const getParsedDuration = () => {
+    const parsed = parseInt(customDuration, 10);
+    return Math.max(1, Math.min(600, isNaN(parsed) ? (durationMinutes || 120) : parsed));
+  };
 
   const handleAction = async (action: "start" | "pause" | "resume" | "end" | "adjust_time", params?: { durationMinutes?: number; deltaSeconds?: number }) => {
     setLoadingAction(true);
@@ -100,14 +105,14 @@ export function AdminHeader({
                 min={1}
                 max={600}
                 value={customDuration}
-                onChange={(e) => setCustomDuration(Math.max(1, parseInt(e.target.value, 10) || 120))}
+                onChange={(e) => setCustomDuration(e.target.value)}
                 className="w-12 bg-zinc-950 border border-zinc-700 rounded text-center text-zinc-100 focus:outline-hidden"
               />
               <span>min</span>
             </div>
 
             <button
-              onClick={() => handleAction("start", { durationMinutes: customDuration })}
+              onClick={() => handleAction("start", { durationMinutes: getParsedDuration() })}
               disabled={loadingAction}
               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-mono font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
             >
@@ -203,7 +208,7 @@ export function AdminHeader({
           <button
             onClick={() => {
               if (confirm("Restart competition from NOT_STARTED state?")) {
-                handleAction("start", { durationMinutes: customDuration });
+                handleAction("start", { durationMinutes: getParsedDuration() });
               }
             }}
             disabled={loadingAction}

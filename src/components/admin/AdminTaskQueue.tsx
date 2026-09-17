@@ -26,6 +26,7 @@ export function AdminTaskQueue({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +50,7 @@ export function AdminTaskQueue({
   };
 
   const handleEditSubmit = async (id: number) => {
+    if (!editTitle.trim() || loading) return;
     setLoading(true);
     try {
       await onUpdateTask(id, {
@@ -58,6 +60,16 @@ export function AdminTaskQueue({
       setEditingId(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleReveal = async (id: number, isRevealed: number) => {
+    if (updatingTaskId !== null) return;
+    setUpdatingTaskId(id);
+    try {
+      await onUpdateTask(id, { is_revealed: isRevealed });
+    } finally {
+      setUpdatingTaskId(null);
     }
   };
 
@@ -209,7 +221,8 @@ export function AdminTaskQueue({
                       </button>
                       <button
                         onClick={() => handleEditSubmit(task.id)}
-                        className="px-2.5 py-0.5 text-[10px] bg-zinc-100 text-zinc-900 rounded font-medium"
+                        disabled={loading || !editTitle.trim()}
+                        className="px-2.5 py-0.5 text-[10px] bg-zinc-100 text-zinc-900 rounded font-medium disabled:opacity-40"
                       >
                         Save
                       </button>
@@ -233,20 +246,22 @@ export function AdminTaskQueue({
                             <span>Revealed to teams</span>
                           </span>
                           <button
-                            onClick={() => onUpdateTask(task.id, { is_revealed: 0 })}
-                            className="px-2 py-0.5 text-[10px] bg-zinc-850 hover:bg-zinc-800 text-zinc-400 rounded flex items-center space-x-1 cursor-pointer"
+                            onClick={() => handleToggleReveal(task.id, 0)}
+                            disabled={updatingTaskId === task.id}
+                            className="px-2 py-0.5 text-[10px] bg-zinc-850 hover:bg-zinc-800 text-zinc-400 rounded flex items-center space-x-1 cursor-pointer disabled:opacity-40"
                           >
                             <EyeOff className="w-3 h-3" />
-                            <span>Hide</span>
+                            <span>{updatingTaskId === task.id ? "Updating..." : "Hide"}</span>
                           </button>
                         </>
                       ) : (
                         <button
-                          onClick={() => onUpdateTask(task.id, { is_revealed: 1 })}
-                          className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                          onClick={() => handleToggleReveal(task.id, 1)}
+                          disabled={updatingTaskId === task.id}
+                          className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-40"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Reveal to Teams Now</span>
+                          <span>{updatingTaskId === task.id ? "Revealing..." : "Reveal to Teams Now"}</span>
                         </button>
                       )}
                     </div>

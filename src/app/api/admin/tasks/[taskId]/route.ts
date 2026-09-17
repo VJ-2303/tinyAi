@@ -20,9 +20,13 @@ export async function PUT(
     }
 
     const body = await req.json().catch(() => ({}));
+    if (body?.title !== undefined && (typeof body.title !== "string" || !body.title.trim())) {
+      return NextResponse.json({ error: "Task title cannot be empty" }, { status: 400 });
+    }
+
     const updated = updateTask(id, {
-      title: typeof body?.title === "string" ? body.title : undefined,
-      description_markdown: typeof body?.description_markdown === "string" ? body.description_markdown : undefined,
+      title: typeof body?.title === "string" ? body.title.trim() : undefined,
+      description_markdown: typeof body?.description_markdown === "string" ? body.description_markdown.trim() : undefined,
       is_revealed: typeof body?.is_revealed === "number" ? body.is_revealed : undefined,
       order_index: typeof body?.order_index === "number" ? body.order_index : undefined,
     });

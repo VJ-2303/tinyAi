@@ -60,10 +60,13 @@ export default function AdminPage() {
     setAdminPin(pin);
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(async () => {
     sessionStorage.removeItem("tinyai_admin_pin");
     setAdminPin(null);
-  };
+    try {
+      await fetch("/api/admin/auth", { method: "DELETE" });
+    } catch {}
+  }, []);
 
   // Helper for authenticated requests
   const adminFetch = useCallback(
@@ -77,13 +80,23 @@ export default function AdminPage() {
     [adminPin]
   );
 
-  // 2. Poll competition state, tasks, and teams every 2.5 seconds
+  // 2. Poll competition state, tasks, and teams every 2.5 seconds concurrently
   const fetchDashboardData = useCallback(async () => {
     if (!adminPin) return;
 
     try {
-      // 1. Status
-      const statusRes = await fetch("/api/competition/status");
+      const [statusRes, tasksRes, teamsRes] = await Promise.all([
+        fetch("/api/competition/status"),
+        adminFetch("/api/admin/tasks"),
+        adminFetch("/api/admin/teams"),
+      ]);
+
+      // If unauthorized, credentials expired/invalid -> logout to show login gate
+      if (tasksRes.status === 401 || teamsRes.status === 401) {
+        handleLogout();
+        return;
+      }
+
       if (statusRes.ok) {
         const data = await statusRes.json();
         setCompetition({
@@ -93,15 +106,11 @@ export default function AdminPage() {
         });
       }
 
-      // 2. Tasks
-      const tasksRes = await adminFetch("/api/admin/tasks");
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json();
         setTasks(tasksData.tasks || []);
       }
 
-      // 3. Teams
-      const teamsRes = await adminFetch("/api/admin/teams");
       if (teamsRes.ok) {
         const teamsData = await teamsRes.json();
         setTeams(teamsData.teams || []);
@@ -117,7 +126,19 @@ export default function AdminPage() {
         console.warn("Dashboard poll issue:", err);
       }
     }
-  }, [adminPin, adminFetch]);
+  }, [adminPin, adminFetch, handleLogout]);
+
+  // Smooth local 1-second timer tick while status is RUNNING
+  useEffect(() => {
+    if (competition.status !== "RUNNING") return;
+    const timer = setInterval(() => {
+      setCompetition((prev) => {
+        if (prev.status !== "RUNNING" || prev.remaining_seconds <= 0) return prev;
+        return { ...prev, remaining_seconds: Math.max(0, prev.remaining_seconds - 1) };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [competition.status]);
 
   useEffect(() => {
     if (!adminPin) return;
@@ -278,6 +299,7 @@ export default function AdminPage() {
       {/* Inspect Modal */}
       {inspectingTeam && (
         <AdminInspectModal
+          key={inspectingTeam.team.id}
           team={inspectingTeam.team}
           files={inspectingTeam.files}
           violations={inspectingTeam.violations}

@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
+import crypto from "node:crypto";
 
 export type CompetitionStatus = "NOT_STARTED" | "RUNNING" | "PAUSED" | "ENDED";
 
@@ -211,7 +212,8 @@ export function getCompetitionState(): CompetitionState {
 
 export function startCompetition(durationMinutes?: number): CompetitionState {
   const currentState = getCompetitionState();
-  const duration = durationMinutes ?? currentState.duration_minutes ?? 120;
+  const rawDuration = durationMinutes ?? currentState.duration_minutes ?? 120;
+  const duration = Math.max(1, Math.min(1440, rawDuration));
   const totalSeconds = duration * 60;
   const now = Date.now();
 
@@ -287,9 +289,18 @@ export function adjustCompetitionTime(deltaSeconds: number): CompetitionState {
 }
 
 export function verifyAdminPin(pin: string): boolean {
+  if (!pin || typeof pin !== "string") return false;
+  const trimmedPin = pin.trim();
+  if (!trimmedPin) return false;
+
   const state = db.prepare("SELECT admin_pin FROM competition_state WHERE id = 1").get() as { admin_pin: string } | undefined;
-  const expectedPin = process.env.ADMIN_PIN || state?.admin_pin || "admin123";
-  return pin === expectedPin;
+  const expectedPin = (process.env.ADMIN_PIN || state?.admin_pin || "admin123").trim();
+  if (!expectedPin) return false;
+
+  const a = Buffer.from(trimmedPin);
+  const b = Buffer.from(expectedPin);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 // ----------------------------------------------------------------------------
@@ -304,7 +315,8 @@ export function getTasks(revealedOnly = false): Task[] {
 }
 
 export function createTask(title: string, descriptionMarkdown: string, orderIndex?: number): Task {
-  const index = orderIndex ?? (db.prepare("SELECT COUNT(*) as cnt FROM tasks").get() as { cnt: number }).cnt + 1;
+  const nextOrder = (db.prepare("SELECT COALESCE(MAX(order_index), 0) + 1 as next_index FROM tasks").get() as { next_index: number }).next_index;
+  const index = orderIndex ?? nextOrder;
   const res = db.prepare(`
     INSERT INTO tasks (order_index, title, description_markdown, is_revealed, revealed_at)
     VALUES (?, ?, ?, 0, NULL)
@@ -321,7 +333,7 @@ export function updateTask(id: number, updates: { title?: string; description_ma
   const description = updates.description_markdown ?? existing.description_markdown;
   const orderIndex = updates.order_index ?? existing.order_index;
   const isRevealed = updates.is_revealed ?? existing.is_revealed;
-  const revealedAt = isRevealed && !existing.is_revealed ? Date.now() : existing.revealed_at;
+  const revealedAt = isRevealed ? (existing.is_revealed ? existing.revealed_at : Date.now()) : null;
 
   db.prepare(`
     UPDATE tasks
