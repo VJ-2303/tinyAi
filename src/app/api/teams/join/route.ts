@@ -33,27 +33,24 @@ export async function POST(req: NextRequest) {
   <meta charset="UTF-8">
   <title>${team.name} - Game</title>
   <style>
-    body {
+    * { box-sizing: border-box; }
+    html, body {
       margin: 0;
       padding: 0;
-      background: #111;
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-family: sans-serif;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
+      background: #09090b;
     }
     canvas {
-      background: #000;
-      border: 2px solid #333;
+      display: block;
+      width: 100%;
+      height: 100%;
     }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <canvas id="gameCanvas"></canvas>
   <script src="game.js"></script>
 </body>
 </html>`;
@@ -62,17 +59,24 @@ export async function POST(req: NextRequest) {
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+}
+
 function draw() {
-  ctx.fillStyle = '#1e1e2e';
+  ctx.fillStyle = '#09090b';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  ctx.fillStyle = '#68d391';
-  ctx.font = '20px sans-serif';
+  ctx.fillStyle = '#a1a1aa';
+  ctx.font = '16px monospace';
   ctx.textAlign = 'center';
   ctx.fillText('Game Canvas Ready', canvas.width / 2, canvas.height / 2);
 }
 
-draw();
+window.addEventListener('resize', resize);
+resize();
 `;
 
       upsertFile(team.id, "index.html", defaultHtml);

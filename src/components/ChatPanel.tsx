@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Copy, Check, AlertCircle, Clock } from "lucide-react";
+import { Send, Copy, Check, Clock } from "lucide-react";
 import type { PromptRecord } from "@/lib/db";
 
 interface ChatPanelProps {
@@ -146,12 +146,6 @@ export function ChatPanel({
         <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-800">
           Score: {promptCount} prompts
         </span>
-      </div>
-
-      {/* Audit warning banner */}
-      <div className="bg-zinc-900/50 border-b border-zinc-800/80 px-3 py-1.5 text-[10px] font-mono text-zinc-400 flex items-center space-x-1.5">
-        <AlertCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-        <span>Every send increments prompt count by 1. Keep questions precise.</span>
       </div>
 
       {/* Messages list */}

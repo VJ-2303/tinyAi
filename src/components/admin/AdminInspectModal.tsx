@@ -36,11 +36,29 @@ export function AdminInspectModal({
 
     const combinedCss = cssFiles.map((f) => f.content).join("\n");
 
+    const canvasFullStyle = `
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+`;
+
     let html = indexHtml;
     if (html.includes("<head>")) {
-      html = html.replace("<head>", `<head>\n<style>\n${combinedCss}\n</style>`);
+      html = html.replace("<head>", `<head>\n${canvasFullStyle}\n<style>\n${combinedCss}\n</style>`);
     } else {
-      html = `<style>\n${combinedCss}\n</style>\n${html}`;
+      html = `${canvasFullStyle}\n<style>\n${combinedCss}\n</style>\n${html}`;
     }
 
     // Inline JS
