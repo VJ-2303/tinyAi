@@ -55,7 +55,7 @@ export function PreviewPanel({ files, runTrigger }: PreviewPanelProps) {
     // Combine all JS
     const combinedJs = jsFiles.map((f) => `// ${f.filename}\n${f.content}`).join("\n");
 
-    // Error capture harness
+    // Error capture harness (runtime errors + unhandled promise rejections)
     const errorCatcherScript = `
 <script>
   window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -69,6 +69,18 @@ export function PreviewPanel({ files, runTrigger }: PreviewPanelProps) {
     } catch(e) {}
     return false;
   };
+  window.addEventListener('unhandledrejection', function(event) {
+    try {
+      var reason = event.reason;
+      var msg = reason ? (reason.message || reason.toString()) : 'Unhandled Promise Rejection';
+      window.parent.postMessage({
+        type: 'TINYAI_PREVIEW_ERROR',
+        message: msg,
+        filename: '',
+        lineno: undefined
+      }, '*');
+    } catch(e) {}
+  });
 </script>
 `;
 
@@ -91,27 +103,44 @@ export function PreviewPanel({ files, runTrigger }: PreviewPanelProps) {
 </style>
 `;
 
-    // Inject CSS into head and JS into body
     let html = indexHtml;
 
-    // Inject error catcher right after <head> or at start
-    if (html.includes("<head>")) {
-      html = html.replace("<head>", `<head>\n${errorCatcherScript}\n${canvasFullStyle}\n<style>\n${combinedCss}\n</style>`);
-    } else {
-      html = `${errorCatcherScript}\n${canvasFullStyle}\n<style>\n${combinedCss}\n</style>\n${html}`;
-    }
+    // 1. Replace local stylesheet links with inlined styles
+    html = html.replace(/<link\b([^>]*)\bhref=["'](?!https?:\/\/|\/\/)([^"']+)["']([^>]*)\/?>/gi, (match, before, href) => {
+      const cleanHref = href.replace(/^\.\//, "").replace(/^\//, "");
+      const matchedCss = files.find((f) => f.filename === cleanHref);
+      if (matchedCss) {
+        return `<style>\n/* Inlined: ${matchedCss.filename} */\n${matchedCss.content}\n</style>`;
+      }
+      return match;
+    });
 
-    // Replace external script tags matching local files or append all JS to body
-    // Remove local <script src="..."> references to avoid 404s
-    html = html.replace(/<script\s+src=["'](?!http)([^"']+)["']\s*><\/script>/gi, (match, src) => {
-      const matchedJs = files.find((f) => f.filename === src);
+    // 2. Replace local script tags matching local files
+    html = html.replace(/<script\b([^>]*)\bsrc=["'](?!https?:\/\/|\/\/)([^"']+)["']([^>]*)>([\s\S]*?)<\/script>/gi, (match, before, src) => {
+      const cleanSrc = src.replace(/^\.\//, "").replace(/^\//, "");
+      const matchedJs = files.find((f) => f.filename === cleanSrc);
       if (matchedJs) {
         return `<script>\n// Inlined: ${matchedJs.filename}\n${matchedJs.content}\n</script>`;
       }
       return match;
     });
 
-    // If script wasn't already inlined by src replacement, inject remaining JS before </body>
+    // 3. Combine remaining CSS not yet inlined
+    const remainingCss = cssFiles
+      .filter((f) => !html.includes(`/* Inlined: ${f.filename} */`))
+      .map((f) => `/* ${f.filename} */\n${f.content}`)
+      .join("\n");
+
+    const headInjections = `${errorCatcherScript}\n${canvasFullStyle}${remainingCss ? `\n<style>\n${remainingCss}\n</style>` : ""}`;
+
+    // Inject head styling and error catcher
+    if (html.includes("<head>")) {
+      html = html.replace("<head>", `<head>\n${headInjections}`);
+    } else {
+      html = `${headInjections}\n${html}`;
+    }
+
+    // 4. Inject remaining JS not yet inlined before </body>
     const remainingJs = jsFiles
       .filter((f) => !html.includes(`// Inlined: ${f.filename}`))
       .map((f) => `// Inlined: ${f.filename}\n${f.content}`)

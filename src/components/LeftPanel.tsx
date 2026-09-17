@@ -33,8 +33,23 @@ export function LeftPanel({
     const clean = newFilename.trim();
     if (!clean) return;
 
-    if (!clean.includes(".")) {
-      setCreateError("Include extension (e.g. game.js, style.css)");
+    if (/[\\/:*?"<>|]/.test(clean)) {
+      setCreateError("Filename cannot contain special characters like / \\ : * ? \" < > |");
+      return;
+    }
+
+    if (!clean.includes(".") || clean.startsWith(".") || clean.endsWith(".")) {
+      setCreateError("Include valid extension (e.g. game.js, style.css)");
+      return;
+    }
+
+    if (clean.length > 50) {
+      setCreateError("Filename too long (max 50 chars)");
+      return;
+    }
+
+    if (files.some((f) => f.filename.toLowerCase() === clean.toLowerCase())) {
+      setCreateError(`File '${clean}' already exists`);
       return;
     }
 

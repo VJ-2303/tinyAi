@@ -56,7 +56,14 @@ export function ChatPanel({
       await onSendPrompt(clean);
       setCooldownRemaining(cooldownSeconds);
     } catch (err: unknown) {
-      console.error("Chat error:", err);
+      // Restore input text so team doesn't lose what they typed
+      setInput(clean);
+      if (err && typeof err === "object" && "remainingCooldown" in err) {
+        const remaining = Number((err as { remainingCooldown?: number }).remainingCooldown);
+        if (remaining > 0) {
+          setCooldownRemaining(remaining);
+        }
+      }
     } finally {
       setIsSending(false);
     }

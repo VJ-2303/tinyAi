@@ -203,10 +203,20 @@ export default function WorkspacePage() {
     prevStatusRef.current = competition.status;
   }, [competition.status]);
 
+  // Proctoring debounce guard to avoid cascading strikes on single alt-tab
+  const lastReportedViolationRef = useRef(0);
+
   // Report proctoring violation to backend
   const reportViolation = useCallback(
     async (reason: "TAB_SWITCH" | "FULLSCREEN_EXIT" | "FOCUS_LOST") => {
       if (!team || competition.status !== "RUNNING" || team.is_locked) return;
+
+      const now = Date.now();
+      // Ignore cascading window events within 2 seconds of each other
+      if (now - lastReportedViolationRef.current < 2000) {
+        return;
+      }
+      lastReportedViolationRef.current = now;
 
       try {
         const res = await fetch(`/api/teams/${team.id}/violations`, {
@@ -320,6 +330,11 @@ export default function WorkspacePage() {
 
   const handleCreateFile = async (filename: string) => {
     if (!team) return;
+
+    if (files.some((f) => f.filename.toLowerCase() === filename.toLowerCase())) {
+      throw new Error(`File '${filename}' already exists`);
+    }
+
     const res = await fetch(`/api/teams/${team.id}/files`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -332,8 +347,8 @@ export default function WorkspacePage() {
     }
 
     const data = await res.json();
-    setFiles((prev) => [...prev, data.file]);
-    setSavedFiles((prev) => [...prev, data.file]);
+    setFiles((prev) => [...prev.filter((f) => f.filename !== filename), data.file]);
+    setSavedFiles((prev) => [...prev.filter((f) => f.filename !== filename), data.file]);
     setActiveFilename(filename);
   };
 
@@ -349,6 +364,8 @@ export default function WorkspacePage() {
       if (activeFilename === filename) {
         setActiveFilename("index.html");
       }
+      // Re-run preview to unload deleted file from runtime
+      setRunTrigger((prev) => prev + 1);
     }
   };
 
@@ -369,23 +386,34 @@ export default function WorkspacePage() {
     setChatHistory((prev) => [...prev, tempUserMsg]);
     setTeam((prev) => (prev ? { ...prev, prompt_count: prev.prompt_count + 1 } : null));
 
-    const res = await fetch(`/api/teams/${team.id}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
+    try {
+      const res = await fetch(`/api/teams/${team.id}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
 
-    if (!res.ok) {
-      const err = await res.json();
-      // Remove optimistic message on hard failure
-      setChatHistory((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
-      throw new Error(err.error || "Failed to get AI response");
-    }
+      if (!res.ok) {
+        const err = await res.json();
+        // Rollback optimistic message and prompt count on failure
+        setChatHistory((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+        setTeam((prev) => (prev ? { ...prev, prompt_count: Math.max(0, prev.prompt_count - 1) } : null));
+        const errorWithCooldown = new Error(err.error || "Failed to get AI response") as Error & {
+          remainingCooldown?: number;
+        };
+        if (typeof err.remainingCooldown === "number") {
+          errorWithCooldown.remainingCooldown = err.remainingCooldown;
+        }
+        throw errorWithCooldown;
+      }
 
-    const data = await res.json();
-    setChatHistory((prev) => [...prev, data.message]);
-    if (data.prompt_count) {
-      setTeam((prev) => (prev ? { ...prev, prompt_count: data.prompt_count } : null));
+      const data = await res.json();
+      setChatHistory((prev) => [...prev, data.message]);
+      if (typeof data.prompt_count === "number") {
+        setTeam((prev) => (prev ? { ...prev, prompt_count: data.prompt_count } : null));
+      }
+    } catch (err) {
+      throw err;
     }
   };
 
@@ -395,6 +423,10 @@ export default function WorkspacePage() {
       localStorage.removeItem("tinyai_team_id");
       setTeam(null);
       setFiles([]);
+      setSavedFiles([]);
+      setChatHistory([]);
+      setActiveFilename("index.html");
+      setRunTrigger(0);
     }
   };
 

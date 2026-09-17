@@ -55,24 +55,45 @@ export function AdminInspectModal({
 `;
 
     let html = indexHtml;
-    if (html.includes("<head>")) {
-      html = html.replace("<head>", `<head>\n${canvasFullStyle}\n<style>\n${combinedCss}\n</style>`);
-    } else {
-      html = `${canvasFullStyle}\n<style>\n${combinedCss}\n</style>\n${html}`;
-    }
 
-    // Inline JS
-    html = html.replace(/<script\s+src=["'](?!http)([^"']+)["']\s*><\/script>/gi, (match, src) => {
-      const matchedJs = files.find((f) => f.filename === src);
-      if (matchedJs) {
-        return `<script>\n${matchedJs.content}\n</script>`;
+    // 1. Replace local stylesheet links with inlined styles
+    html = html.replace(/<link\b([^>]*)\bhref=["'](?!https?:\/\/|\/\/)([^"']+)["']([^>]*)\/?>/gi, (match, before, href) => {
+      const cleanHref = href.replace(/^\.\//, "").replace(/^\//, "");
+      const matchedCss = files.find((f) => f.filename === cleanHref);
+      if (matchedCss) {
+        return `<style>\n/* Inlined: ${matchedCss.filename} */\n${matchedCss.content}\n</style>`;
       }
       return match;
     });
 
+    // 2. Replace local script tags matching local files
+    html = html.replace(/<script\b([^>]*)\bsrc=["'](?!https?:\/\/|\/\/)([^"']+)["']([^>]*)>([\s\S]*?)<\/script>/gi, (match, before, src) => {
+      const cleanSrc = src.replace(/^\.\//, "").replace(/^\//, "");
+      const matchedJs = files.find((f) => f.filename === cleanSrc);
+      if (matchedJs) {
+        return `<script>\n// Inlined: ${matchedJs.filename}\n${matchedJs.content}\n</script>`;
+      }
+      return match;
+    });
+
+    // 3. Combine remaining CSS not yet inlined
+    const remainingCss = cssFiles
+      .filter((f) => !html.includes(`/* Inlined: ${f.filename} */`))
+      .map((f) => `/* ${f.filename} */\n${f.content}`)
+      .join("\n");
+
+    const headInjections = `${canvasFullStyle}${remainingCss ? `\n<style>\n${remainingCss}\n</style>` : ""}`;
+
+    if (html.includes("<head>")) {
+      html = html.replace("<head>", `<head>\n${headInjections}`);
+    } else {
+      html = `${headInjections}\n${html}`;
+    }
+
+    // 4. Inject remaining JS not yet inlined before </body>
     const remainingJs = jsFiles
-      .filter((f) => !html.includes(f.content))
-      .map((f) => f.content)
+      .filter((f) => !html.includes(`// Inlined: ${f.filename}`))
+      .map((f) => `// Inlined: ${f.filename}\n${f.content}`)
       .join("\n");
 
     if (remainingJs.trim()) {

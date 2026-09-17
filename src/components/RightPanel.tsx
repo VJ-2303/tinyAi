@@ -65,10 +65,11 @@ export function RightPanel({
       </div>
 
       {/* Panel Body */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === "preview" ? (
+      <div className="flex-1 overflow-hidden relative">
+        <div className={`h-full w-full ${activeTab === "preview" ? "block" : "hidden"}`}>
           <PreviewPanel files={files} runTrigger={runTrigger} />
-        ) : (
+        </div>
+        <div className={`h-full w-full ${activeTab === "chat" ? "block" : "hidden"}`}>
           <ChatPanel
             teamId={teamId}
             history={chatHistory}
@@ -78,7 +79,7 @@ export function RightPanel({
             lockReason={lockReason}
             cooldownSeconds={cooldownSeconds}
           />
-        )}
+        </div>
       </div>
     </div>
   );
