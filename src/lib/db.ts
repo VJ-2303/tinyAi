@@ -66,6 +66,7 @@ function initDatabase(): DatabaseSync {
   const db = new DatabaseSync(dbPath);
 
   // Performance and integrity pragmas
+  db.exec("PRAGMA busy_timeout = 10000;");
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON;");
 
