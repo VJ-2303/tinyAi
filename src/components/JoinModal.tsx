@@ -30,7 +30,7 @@ export function JoinModal({ onJoin }: JoinModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-lg p-6 shadow-2xl">
         <div className="flex items-center space-x-2 text-zinc-400 text-xs font-mono mb-3">
           <Terminal className="w-4 h-4 text-zinc-300" />

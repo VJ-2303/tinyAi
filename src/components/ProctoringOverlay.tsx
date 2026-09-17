@@ -25,7 +25,7 @@ export function ProctoringOverlay({
   // 1. Permanent lockout screen on Strike 3
   if (isLockedByStrikes) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 select-none">
+      <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 select-none">
         <div className="w-full max-w-md bg-zinc-950 border border-red-900 rounded-lg p-6 text-center space-y-4 shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-red-950/80 border border-red-800 flex items-center justify-center mx-auto text-red-400">
             <Lock className="w-6 h-6" />
@@ -54,7 +54,7 @@ export function ProctoringOverlay({
   // 2. Fullscreen prompt modal when competition starts
   if (needsFullscreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+      <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 select-none">
         <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-lg p-6 text-center space-y-4 shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-emerald-950/80 border border-emerald-800 flex items-center justify-center mx-auto text-emerald-400">
             <Maximize2 className="w-6 h-6" />
@@ -87,7 +87,7 @@ export function ProctoringOverlay({
   // 3. Strike 1 & 2 Warning Modal
   if (showWarningModal) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+      <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 select-none">
         <div className="w-full max-w-md bg-zinc-950 border border-amber-800 rounded-lg p-6 text-center space-y-4 shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-amber-950/80 border border-amber-800 flex items-center justify-center mx-auto text-amber-400">
             <AlertTriangle className="w-6 h-6" />

@@ -148,7 +148,7 @@ export function CodeEditor({
 
         {/* Lock Overlay when not running or locked */}
         {isLocked && (
-          <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
+          <div className="absolute inset-0 z-20 bg-zinc-950/90 flex flex-col items-center justify-center p-6 text-center">
             <Lock className="w-8 h-8 text-zinc-400 mb-2" />
             <h3 className="text-sm font-semibold text-zinc-200 uppercase font-mono tracking-wider">
               Editor Locked
