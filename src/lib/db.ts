@@ -73,6 +73,9 @@ function initDatabase(): DatabaseSync {
   } catch {
     // WAL mode may already be active or locked by concurrent worker
   }
+  db.exec("PRAGMA synchronous = NORMAL;");
+  db.exec("PRAGMA cache_size = -64000;"); // 64MB memory page cache
+  db.exec("PRAGMA temp_store = MEMORY;");
   db.exec("PRAGMA foreign_keys = ON;");
 
   // 1. competition_state table
@@ -180,14 +183,14 @@ export function getCompetitionState(): CompetitionState {
     throw new Error("Competition state not found");
   }
 
-  // Authoritative timer calculation if running
+  // Authoritative in-memory timer calculation (read-only; zero disk write locks during ticks)
   if (row.status === "RUNNING" && row.started_at) {
     const now = Date.now();
     const elapsedSeconds = Math.floor((now - row.started_at) / 1000);
-    const newRemaining = Math.max(0, row.remaining_seconds - elapsedSeconds);
+    const calculatedRemaining = Math.max(0, row.remaining_seconds - elapsedSeconds);
 
-    if (newRemaining === 0) {
-      // Auto-expire to ENDED
+    if (calculatedRemaining === 0) {
+      // Auto-expire to ENDED (one-time state transition write)
       db.prepare(`
         UPDATE competition_state
         SET status = 'ENDED', remaining_seconds = 0, started_at = NULL, paused_at = NULL
@@ -195,15 +198,9 @@ export function getCompetitionState(): CompetitionState {
       `).run();
       row.status = "ENDED";
       row.remaining_seconds = 0;
+      row.started_at = null;
     } else {
-      // Update remaining seconds and reset started_at to now for continuous decay tracking
-      db.prepare(`
-        UPDATE competition_state
-        SET remaining_seconds = ?, started_at = ?
-        WHERE id = 1
-      `).run(newRemaining, now);
-      row.remaining_seconds = newRemaining;
-      row.started_at = now;
+      row.remaining_seconds = calculatedRemaining;
     }
   }
 
@@ -238,10 +235,11 @@ export function pauseCompetition(): CompetitionState {
   db.prepare(`
     UPDATE competition_state
     SET status = 'PAUSED',
+        remaining_seconds = ?,
         started_at = NULL,
         paused_at = ?
     WHERE id = 1
-  `).run(now);
+  `).run(currentState.remaining_seconds, now);
 
   return getCompetitionState();
 }
@@ -278,12 +276,14 @@ export function endCompetition(): CompetitionState {
 export function adjustCompetitionTime(deltaSeconds: number): CompetitionState {
   const currentState = getCompetitionState();
   const newRemaining = Math.max(0, currentState.remaining_seconds + deltaSeconds);
+  const now = Date.now();
 
   db.prepare(`
     UPDATE competition_state
-    SET remaining_seconds = ?
+    SET remaining_seconds = ?,
+        started_at = CASE WHEN status = 'RUNNING' THEN ? ELSE started_at END
     WHERE id = 1
-  `).run(newRemaining);
+  `).run(newRemaining, now);
 
   return getCompetitionState();
 }
@@ -401,9 +401,19 @@ export function unlockTeam(teamId: string): Team | null {
 export function getAllTeamsWithStats(): (Team & { file_count: number; violation_count: number })[] {
   return db.prepare(`
     SELECT t.*,
-           (SELECT COUNT(*) FROM files f WHERE f.team_id = t.id) as file_count,
-           (SELECT COUNT(*) FROM violations v WHERE v.team_id = t.id) as violation_count
+           COALESCE(f.file_count, 0) as file_count,
+           COALESCE(v.violation_count, 0) as violation_count
     FROM teams t
+    LEFT JOIN (
+      SELECT team_id, COUNT(*) as file_count
+      FROM files
+      GROUP BY team_id
+    ) f ON f.team_id = t.id
+    LEFT JOIN (
+      SELECT team_id, COUNT(*) as violation_count
+      FROM violations
+      GROUP BY team_id
+    ) v ON v.team_id = t.id
     ORDER BY t.prompt_count ASC, t.created_at ASC
   `).all() as unknown as (Team & { file_count: number; violation_count: number })[];
 }
