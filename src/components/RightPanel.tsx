@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Bot } from "lucide-react";
+import { Play } from "lucide-react";
 import { PreviewPanel } from "./PreviewPanel";
 import { ChatPanel } from "./ChatPanel";
 import type { FileRecord, PromptRecord } from "@/lib/db";
@@ -56,7 +56,6 @@ export function RightPanel({
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
-            <Bot className="w-3.5 h-3.5 text-zinc-400" />
             <span>AI Chat</span>
             <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-800 text-zinc-300">
               {promptCount}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Bot, User, Copy, Check, AlertCircle, Clock } from "lucide-react";
+import { Send, Copy, Check, AlertCircle, Clock } from "lucide-react";
 import type { PromptRecord } from "@/lib/db";
 
 interface ChatPanelProps {
@@ -139,7 +139,6 @@ export function ChatPanel({
       {/* Chat header */}
       <div className="h-9 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center space-x-2 text-xs font-mono text-zinc-300">
-          <Bot className="w-3.5 h-3.5 text-zinc-400" />
           <span className="font-semibold text-zinc-200 uppercase tracking-wider text-[11px]">
             AI Assistant (&lt;1B LLM)
           </span>
@@ -158,9 +157,8 @@ export function ChatPanel({
       {/* Messages list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {history.length === 0 ? (
-          <div className="py-12 px-4 text-center text-zinc-500 text-xs space-y-2 font-mono">
-            <Bot className="w-8 h-8 mx-auto text-zinc-700 stroke-1" />
-            <p className="font-medium text-zinc-400">Ask coding or syntax questions</p>
+          <div className="py-12 px-4 text-center text-zinc-500 text-xs space-y-1.5 font-mono">
+            <p className="font-medium text-zinc-300">Ask coding or syntax questions</p>
             <p className="text-[11px] text-zinc-600 max-w-xs mx-auto">
               Weak models cannot reason multi-step architecture. Ask for small, self-contained functions or math logic.
             </p>
@@ -171,27 +169,18 @@ export function ChatPanel({
             return (
               <div
                 key={msg.id || idx}
-                className={`flex items-start space-x-2 text-xs ${
-                  isUser ? "flex-row-reverse space-x-reverse" : "flex-row"
-                }`}
+                className={`flex text-xs ${isUser ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`w-6 h-6 rounded flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-mono ${
-                    isUser
-                      ? "bg-zinc-800 text-zinc-200 border border-zinc-700"
-                      : "bg-zinc-900 text-zinc-400 border border-zinc-800"
-                  }`}
-                >
-                  {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
-                </div>
-
-                <div
-                  className={`max-w-[85%] rounded p-2.5 leading-relaxed font-sans text-xs select-text ${
+                  className={`max-w-[88%] rounded p-2.5 leading-relaxed font-sans text-xs select-text ${
                     isUser
                       ? "bg-zinc-800 text-zinc-100 border border-zinc-700 whitespace-pre-wrap"
                       : "bg-zinc-900 text-zinc-300 border border-zinc-800"
                   }`}
                 >
+                  <div className="text-[10px] font-mono text-zinc-500 mb-1 uppercase tracking-wider font-semibold">
+                    {isUser ? "Team" : "Assistant"}
+                  </div>
                   {isUser ? msg.content : renderMessageContent(msg.content, idx)}
                 </div>
               </div>
@@ -200,11 +189,9 @@ export function ChatPanel({
         )}
 
         {isSending && (
-          <div className="flex items-center space-x-2 text-xs text-zinc-400 font-mono">
-            <div className="w-6 h-6 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-              <Bot className="w-3.5 h-3.5 text-zinc-500 animate-pulse" />
-            </div>
-            <span className="text-[11px] animate-pulse">Model generating code...</span>
+          <div className="flex items-center space-x-2 text-xs text-zinc-400 font-mono py-1">
+            <span className="w-2 h-2 rounded-full bg-zinc-500 animate-pulse" />
+            <span className="text-[11px] animate-pulse">Assistant generating response...</span>
           </div>
         )}
 

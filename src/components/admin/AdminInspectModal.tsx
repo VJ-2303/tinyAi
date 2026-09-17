@@ -278,7 +278,7 @@ export function AdminInspectModal({
                     >
                       <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1.5">
                         <span className="uppercase font-bold tracking-wider">
-                          {isUser ? "👤 Team Prompt" : "🤖 Local AI Response"}
+                          {isUser ? "Team Prompt" : "AI Response"}
                         </span>
                         <span>{new Date(p.created_at).toLocaleTimeString()}</span>
                       </div>
