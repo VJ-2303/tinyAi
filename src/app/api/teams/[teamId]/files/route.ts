@@ -21,7 +21,7 @@ export async function GET(
     }
 
     const files = getTeamFiles(teamId);
-    return NextResponse.json({ files });
+    return NextResponse.json({ files, team });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
     return NextResponse.json({ error: msg }, { status: 500 });

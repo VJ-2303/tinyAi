@@ -14,6 +14,7 @@ export default function WorkspacePage() {
   // Session & Team state
   const [team, setTeam] = useState<Team | null>(null);
   const [files, setFiles] = useState<FileRecord[]>([]);
+  const [savedFiles, setSavedFiles] = useState<FileRecord[]>([]);
   const [activeFilename, setActiveFilename] = useState<string>("index.html");
   const [chatHistory, setChatHistory] = useState<PromptRecord[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,6 +57,7 @@ export default function WorkspacePage() {
     const data = await res.json();
     setTeam(data.team);
     setFiles(data.files || []);
+    setSavedFiles(data.files || []);
     if (data.files?.length > 0) {
       setActiveFilename(data.files[0].filename);
     }
@@ -96,12 +98,14 @@ export default function WorkspacePage() {
         tasks: data.tasks || [],
       });
 
-      // If team is active, poll files and strike status
+      // If team is active, poll strike & lock status without overwriting in-editor files
       if (team) {
-        const teamFilesRes = await fetch(`/api/teams/${team.id}/files`);
-        if (teamFilesRes.ok) {
-          const filesData = await teamFilesRes.json();
-          setFiles(filesData.files || []);
+        const teamRes = await fetch(`/api/teams/${team.id}/files`);
+        if (teamRes.ok) {
+          const filesData = await teamRes.json();
+          if (filesData.team) {
+            setTeam((prev) => (prev ? { ...prev, ...filesData.team } : prev));
+          }
         }
       }
     } catch (err) {
@@ -233,26 +237,41 @@ export default function WorkspacePage() {
   };
 
   const handleSaveAndRun = useCallback(async () => {
-    if (!team || !activeFile) return;
+    if (!team) return;
     setIsSaving(true);
 
     try {
-      await fetch(`/api/teams/${team.id}/files`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: activeFile.filename,
-          content: activeFile.content,
-        }),
+      // Collect modified files between working `files` and `savedFiles`
+      const dirtyFiles = files.filter((f) => {
+        const saved = savedFiles.find((sf) => sf.filename === f.filename);
+        return !saved || saved.content !== f.content;
       });
-      // Trigger iframe reload
+
+      // If activeFile is set, ensure it's included in save payload
+      const filesToSave = dirtyFiles.length > 0 ? dirtyFiles : activeFile ? [activeFile] : [];
+
+      await Promise.all(
+        filesToSave.map((f) =>
+          fetch(`/api/teams/${team.id}/files`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: f.filename,
+              content: f.content,
+            }),
+          })
+        )
+      );
+
+      // Only after pressing save, files are stored and preview reloads
+      setSavedFiles(files);
       setRunTrigger((prev) => prev + 1);
     } catch (err) {
       console.error("Failed to save file:", err);
     } finally {
       setIsSaving(false);
     }
-  }, [team, activeFile]);
+  }, [team, activeFile, files, savedFiles]);
 
   const handleCreateFile = async (filename: string) => {
     if (!team) return;
@@ -269,6 +288,7 @@ export default function WorkspacePage() {
 
     const data = await res.json();
     setFiles((prev) => [...prev, data.file]);
+    setSavedFiles((prev) => [...prev, data.file]);
     setActiveFilename(filename);
   };
 
@@ -280,6 +300,7 @@ export default function WorkspacePage() {
 
     if (res.ok) {
       setFiles((prev) => prev.filter((f) => f.filename !== filename));
+      setSavedFiles((prev) => prev.filter((f) => f.filename !== filename));
       if (activeFilename === filename) {
         setActiveFilename("index.html");
       }
@@ -386,6 +407,7 @@ export default function WorkspacePage() {
             <CodeEditor
               activeFile={activeFile}
               files={files}
+              savedFiles={savedFiles}
               onSelectFile={setActiveFilename}
               onChangeContent={handleUpdateFileContent}
               onSaveAndRun={handleSaveAndRun}
@@ -401,7 +423,7 @@ export default function WorkspacePage() {
           <Panel defaultSize="33%" minSize={260}>
             <RightPanel
               teamId={team?.id || ""}
-              files={files}
+              files={savedFiles}
               runTrigger={runTrigger}
               chatHistory={chatHistory}
               promptCount={team?.prompt_count || 0}

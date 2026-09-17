@@ -135,11 +135,11 @@ export function HeaderBar({
         {/* Run Preview Action Button */}
         <button
           onClick={onRunPreview}
-          title="Run / Reload Game Preview (Ctrl+S or Ctrl+Enter)"
+          title="Save files to server and load into live preview (Ctrl+S or Ctrl+Enter)"
           className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded text-xs font-medium flex items-center space-x-1 transition-colors cursor-pointer"
         >
           <Play className="w-3 h-3 fill-current" />
-          <span>Run</span>
+          <span>Save & Run</span>
         </button>
 
         {/* Fullscreen Toggle */}

@@ -2,12 +2,13 @@
 
 import React, { useEffect, useRef } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
-import { Lock, FileCode, Check } from "lucide-react";
+import { Lock, FileCode, Check, Play } from "lucide-react";
 import type { FileRecord } from "@/lib/db";
 
 interface CodeEditorProps {
   activeFile: FileRecord | null;
   files: FileRecord[];
+  savedFiles?: FileRecord[];
   onSelectFile: (filename: string) => void;
   onChangeContent: (newContent: string) => void;
   onSaveAndRun: () => void;
@@ -19,6 +20,7 @@ interface CodeEditorProps {
 export function CodeEditor({
   activeFile,
   files,
+  savedFiles,
   onSelectFile,
   onChangeContent,
   onSaveAndRun,
@@ -36,6 +38,12 @@ export function CodeEditor({
     if (filename.endsWith(".json")) return "json";
     return "plaintext";
   };
+
+  // Check if active file has unsaved modifications
+  const currentSavedFile = savedFiles?.find((f) => f.filename === activeFile?.filename);
+  const isDirty = Boolean(
+    activeFile && currentSavedFile && activeFile.content !== currentSavedFile.content
+  );
 
   // Bind Ctrl+S / Cmd+S and Ctrl+Enter keyboard shortcuts
   useEffect(() => {
@@ -83,11 +91,14 @@ export function CodeEditor({
         <div className="flex items-center space-x-1 h-full">
           {files.map((f) => {
             const isActive = f.filename === activeFile?.filename;
+            const fileSaved = savedFiles?.find((sf) => sf.filename === f.filename);
+            const fileIsDirty = Boolean(fileSaved && f.content !== fileSaved.content);
+
             return (
               <button
                 key={f.id}
                 onClick={() => onSelectFile(f.filename)}
-                className={`h-7 px-3 rounded-t text-xs font-mono flex items-center space-x-1.5 transition-colors cursor-pointer ${
+                className={`h-7 px-2.5 rounded-t text-xs font-mono flex items-center space-x-1.5 transition-colors cursor-pointer shrink-0 ${
                   isActive
                     ? "bg-zinc-950 text-zinc-100 border-t-2 border-emerald-500 font-medium"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
@@ -95,23 +106,44 @@ export function CodeEditor({
               >
                 <FileCode className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{f.filename}</span>
+                {fileIsDirty && (
+                  <span
+                    title="Unsaved changes"
+                    className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                  />
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Shortcut and Save indicator */}
-        <div className="flex items-center space-x-2 text-[11px] text-zinc-500 font-mono pr-2">
+        {/* Shortcut, Save indicator and Run button */}
+        <div className="flex items-center space-x-2 text-[11px] font-mono pr-1 shrink-0">
           {isSaving ? (
             <span className="text-zinc-400 animate-pulse">Saving...</span>
+          ) : isDirty ? (
+            <span className="flex items-center space-x-1 text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span>Unsaved</span>
+            </span>
           ) : (
             <span className="flex items-center space-x-1 text-zinc-500">
               <Check className="w-3 h-3 text-emerald-500" />
               <span>Saved</span>
             </span>
           )}
-          <span className="text-zinc-600">|</span>
-          <span className="text-zinc-400">Ctrl+S to Run</span>
+
+          <span className="text-zinc-700">|</span>
+
+          <button
+            onClick={onSaveAndRun}
+            disabled={isLocked || isSaving}
+            title="Save changes to server and reload game preview (Ctrl+S)"
+            className="flex items-center space-x-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 text-white rounded text-[11px] font-medium transition-colors cursor-pointer"
+          >
+            <Play className="w-3 h-3 fill-current" />
+            <span>Save & Run</span>
+          </button>
         </div>
       </div>
 
