@@ -1,69 +1,431 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Group, Panel, Separator } from "react-resizable-panels";
+import { HeaderBar } from "@/components/HeaderBar";
+import { LeftPanel } from "@/components/LeftPanel";
+import { CodeEditor } from "@/components/CodeEditor";
+import { RightPanel } from "@/components/RightPanel";
+import { JoinModal } from "@/components/JoinModal";
+import { ProctoringOverlay } from "@/components/ProctoringOverlay";
+import type { Task, FileRecord, PromptRecord, Team } from "@/lib/db";
+
+export default function WorkspacePage() {
+  // Session & Team state
+  const [team, setTeam] = useState<Team | null>(null);
+  const [files, setFiles] = useState<FileRecord[]>([]);
+  const [activeFilename, setActiveFilename] = useState<string>("index.html");
+  const [chatHistory, setChatHistory] = useState<PromptRecord[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Competition state
+  const [competition, setCompetition] = useState<{
+    status: "NOT_STARTED" | "RUNNING" | "PAUSED" | "ENDED";
+    remaining_seconds: number;
+    tasks: Task[];
+  }>({
+    status: "NOT_STARTED",
+    remaining_seconds: 7200,
+    tasks: [],
+  });
+
+  // Runner & UI state
+  const [runTrigger, setRunTrigger] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [needsFullscreen, setNeedsFullscreen] = useState(false);
+
+  // Track if competition just became RUNNING to prompt fullscreen
+  const prevStatusRef = useRef(competition.status);
+
+  // --------------------------------------------------------------------------
+  // 1. Initial Load & Session Restore
+  // --------------------------------------------------------------------------
+  const joinTeam = useCallback(async (teamName: string) => {
+    const res = await fetch("/api/teams/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: teamName }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to join");
+    }
+
+    const data = await res.json();
+    setTeam(data.team);
+    setFiles(data.files || []);
+    if (data.files?.length > 0) {
+      setActiveFilename(data.files[0].filename);
+    }
+
+    localStorage.setItem("tinyai_team_name", data.team.name);
+    localStorage.setItem("tinyai_team_id", data.team.id);
+
+    // Fetch existing chat history
+    const chatRes = await fetch(`/api/teams/${data.team.id}/chat`);
+    if (chatRes.ok) {
+      const chatData = await chatRes.json();
+      setChatHistory(chatData.history || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedName = localStorage.getItem("tinyai_team_name");
+    if (savedName) {
+      joinTeam(savedName).catch(() => {
+        localStorage.removeItem("tinyai_team_name");
+        localStorage.removeItem("tinyai_team_id");
+      });
+    }
+  }, [joinTeam]);
+
+  // --------------------------------------------------------------------------
+  // 2. State Synchronization Short Polling (every 2.5s)
+  // --------------------------------------------------------------------------
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/competition/status");
+      if (!res.ok) return;
+      const data = await res.json();
+
+      setCompetition({
+        status: data.status,
+        remaining_seconds: data.remaining_seconds,
+        tasks: data.tasks || [],
+      });
+
+      // If team is active, poll files and strike status
+      if (team) {
+        const teamFilesRes = await fetch(`/api/teams/${team.id}/files`);
+        if (teamFilesRes.ok) {
+          const filesData = await teamFilesRes.json();
+          setFiles(filesData.files || []);
+        }
+      }
+    } catch (err) {
+      console.error("Status polling failed:", err);
+    }
+  }, [team]);
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 2500);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  // --------------------------------------------------------------------------
+  // 3. Fullscreen & Proctoring Triggers
+  // --------------------------------------------------------------------------
+  const enterFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement
+        .requestFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+          setNeedsFullscreen(false);
+          setShowWarningModal(false);
+        })
+        .catch((err) => console.error("Fullscreen request failed:", err));
+    } else {
+      setIsFullscreen(true);
+      setNeedsFullscreen(false);
+      setShowWarningModal(false);
+    }
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      enterFullscreen();
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }, [enterFullscreen]);
+
+  // When competition transitions to RUNNING, trigger fullscreen requirement
+  useEffect(() => {
+    if (prevStatusRef.current !== "RUNNING" && competition.status === "RUNNING") {
+      if (!document.fullscreenElement) {
+        setNeedsFullscreen(true);
+      }
+    }
+    prevStatusRef.current = competition.status;
+  }, [competition.status]);
+
+  // Report proctoring violation to backend
+  const reportViolation = useCallback(
+    async (reason: "TAB_SWITCH" | "FULLSCREEN_EXIT" | "FOCUS_LOST") => {
+      if (!team || competition.status !== "RUNNING" || team.is_locked) return;
+
+      try {
+        const res = await fetch(`/api/teams/${team.id}/violations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setTeam((prev) => (prev ? { ...prev, strike_count: data.strike_count, is_locked: data.is_locked } : null));
+
+          if (data.is_locked) {
+            setShowWarningModal(false);
+          } else if (data.strike_count > 0) {
+            setShowWarningModal(true);
+          }
+        }
+      } catch (err) {
+        console.error("Violation report failed:", err);
+      }
+    },
+    [team, competition.status]
+  );
+
+  // Attach window event listeners for proctoring
+  useEffect(() => {
+    if (!team || competition.status !== "RUNNING") return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        reportViolation("TAB_SWITCH");
+      }
+    };
+
+    const handleBlur = () => {
+      // Short delay to avoid blur during internal focus switches
+      setTimeout(() => {
+        if (!document.hasFocus()) {
+          reportViolation("FOCUS_LOST");
+        }
+      }, 300);
+    };
+
+    const handleFullscreenChange = () => {
+      const isNowFs = Boolean(document.fullscreenElement);
+      setIsFullscreen(isNowFs);
+      if (!isNowFs && competition.status === "RUNNING") {
+        reportViolation("FULLSCREEN_EXIT");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, [team, competition.status, reportViolation]);
+
+  // --------------------------------------------------------------------------
+  // 4. File Management & Code Editing
+  // --------------------------------------------------------------------------
+  const activeFile = files.find((f) => f.filename === activeFilename) || files[0] || null;
+
+  const handleUpdateFileContent = (newContent: string) => {
+    if (!activeFile) return;
+    setFiles((prev) =>
+      prev.map((f) => (f.filename === activeFile.filename ? { ...f, content: newContent } : f))
+    );
+  };
+
+  const handleSaveAndRun = useCallback(async () => {
+    if (!team || !activeFile) return;
+    setIsSaving(true);
+
+    try {
+      await fetch(`/api/teams/${team.id}/files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: activeFile.filename,
+          content: activeFile.content,
+        }),
+      });
+      // Trigger iframe reload
+      setRunTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error("Failed to save file:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [team, activeFile]);
+
+  const handleCreateFile = async (filename: string) => {
+    if (!team) return;
+    const res = await fetch(`/api/teams/${team.id}/files`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, content: `// ${filename}\n` }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to create file");
+    }
+
+    const data = await res.json();
+    setFiles((prev) => [...prev, data.file]);
+    setActiveFilename(filename);
+  };
+
+  const handleDeleteFile = async (filename: string) => {
+    if (!team) return;
+    const res = await fetch(`/api/teams/${team.id}/files?filename=${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setFiles((prev) => prev.filter((f) => f.filename !== filename));
+      if (activeFilename === filename) {
+        setActiveFilename("index.html");
+      }
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // 5. AI Chat Action
+  // --------------------------------------------------------------------------
+  const handleSendPrompt = async (message: string) => {
+    if (!team) return;
+
+    // Optimistically append user message
+    const tempUserMsg: PromptRecord = {
+      id: Date.now(),
+      team_id: team.id,
+      role: "user",
+      content: message,
+      created_at: Date.now(),
+    };
+    setChatHistory((prev) => [...prev, tempUserMsg]);
+    setTeam((prev) => (prev ? { ...prev, prompt_count: prev.prompt_count + 1 } : null));
+
+    const res = await fetch(`/api/teams/${team.id}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      // Remove optimistic message on hard failure
+      setChatHistory((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+      throw new Error(err.error || "Failed to get AI response");
+    }
+
+    const data = await res.json();
+    setChatHistory((prev) => [...prev, data.message]);
+    if (data.prompt_count) {
+      setTeam((prev) => (prev ? { ...prev, prompt_count: data.prompt_count } : null));
+    }
+  };
+
+  const handleLeaveTeam = () => {
+    if (confirm("Leave this workstation session? Your code will remain safely saved.")) {
+      localStorage.removeItem("tinyai_team_name");
+      localStorage.removeItem("tinyai_team_id");
+      setTeam(null);
+      setFiles([]);
+    }
+  };
+
+  // Lock status calculation
+  const isWorkspaceLocked =
+    competition.status !== "RUNNING" || (team ? Boolean(team.is_locked) : false);
+
+  const lockReason =
+    competition.status === "NOT_STARTED"
+      ? "Competition has not started. Waiting for organizer to start timer."
+      : competition.status === "PAUSED"
+      ? "Competition is temporarily paused by organizer."
+      : competition.status === "ENDED"
+      ? "Competition has ended. Code is frozen for judging."
+      : team?.is_locked
+      ? "Workstation locked due to 3 proctoring strikes. Call organizer."
+      : undefined;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+    <div className="h-screen w-screen flex flex-col bg-zinc-950 text-zinc-100 overflow-hidden select-none">
+      {/* Top Utility Header Bar */}
+      <HeaderBar
+        teamName={team?.name || "No Team"}
+        status={competition.status}
+        remainingSeconds={competition.remaining_seconds}
+        promptCount={team?.prompt_count || 0}
+        strikeCount={team?.strike_count || 0}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onRunPreview={handleSaveAndRun}
+        onLeaveTeam={handleLeaveTeam}
+        isSaving={isSaving}
+      />
+
+      {/* 3-Column Resizable Layout */}
+      <div className="flex-1 overflow-hidden">
+        <Group orientation="horizontal" className="h-full w-full">
+          {/* Left Column: Tasks & Files */}
+          <Panel defaultSize="22%" minSize={200} maxSize={450}>
+            <LeftPanel
+              tasks={competition.tasks}
+              files={files}
+              activeFilename={activeFilename}
+              onSelectFile={setActiveFilename}
+              onCreateFile={handleCreateFile}
+              onDeleteFile={handleDeleteFile}
+              isLocked={isWorkspaceLocked}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+          </Panel>
+
+          <Separator className="w-1 bg-zinc-800 hover:bg-zinc-600 transition-colors cursor-col-resize shrink-0" />
+
+          {/* Center Column: Monaco Code Editor */}
+          <Panel defaultSize="45%" minSize={300}>
+            <CodeEditor
+              activeFile={activeFile}
+              files={files}
+              onSelectFile={setActiveFilename}
+              onChangeContent={handleUpdateFileContent}
+              onSaveAndRun={handleSaveAndRun}
+              isLocked={isWorkspaceLocked}
+              lockReason={lockReason}
+              isSaving={isSaving}
+            />
+          </Panel>
+
+          <Separator className="w-1 bg-zinc-800 hover:bg-zinc-600 transition-colors cursor-col-resize shrink-0" />
+
+          {/* Right Column: Switch between Game Preview & AI Chat */}
+          <Panel defaultSize="33%" minSize={260}>
+            <RightPanel
+              teamId={team?.id || ""}
+              files={files}
+              runTrigger={runTrigger}
+              chatHistory={chatHistory}
+              promptCount={team?.prompt_count || 0}
+              onSendPrompt={handleSendPrompt}
+              isLocked={isWorkspaceLocked}
+              lockReason={lockReason}
+              cooldownSeconds={Number(process.env.RATE_LIMIT_COOLDOWN_SECONDS || 10)}
+            />
+          </Panel>
+        </Group>
+      </div>
+
+      {/* Join Modal if not logged in */}
+      {!team && <JoinModal onJoin={joinTeam} />}
+
+      {/* Proctoring & Lock Overlays */}
+      <ProctoringOverlay
+        isLockedByStrikes={Boolean(team?.is_locked)}
+        strikeCount={team?.strike_count || 0}
+        showWarningModal={showWarningModal}
+        needsFullscreen={needsFullscreen}
+        onEnterFullscreen={enterFullscreen}
+        onDismissWarning={() => setShowWarningModal(false)}
+      />
     </div>
   );
 }
