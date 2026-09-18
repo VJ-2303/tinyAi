@@ -13,7 +13,8 @@
     "test:api": "tsx --test tests/api.test.ts",
     "test:e2e": "tsx --test tests/e2e-simulation.test.ts",
     "test:bughunt": "tsx --test tests/bughunt.test.ts",
-    "test:admin-bughunt": "tsx --test tests/admin-bughunt.test.ts"
+    "test:admin-bughunt": "tsx --test tests/admin-bughunt.test.ts",
+    "test:load": "tsx scripts/load-test-50-teams.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.20",
