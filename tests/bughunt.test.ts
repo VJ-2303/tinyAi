@@ -97,6 +97,38 @@ describe("Bug Hunt Verification Suite", () => {
     assert.equal(teamAfter.prompt_count, initialPromptCount);
   });
 
+  it("only increments prompt_count on successful responses, never on blocked or failed prompts", async () => {
+    const teamBefore = dbModule.getTeamById(testTeamId)!;
+    const initialPromptCount = teamBefore.prompt_count;
+
+    // 1. Blocked by cooldown
+    dbModule.db.prepare("UPDATE teams SET last_prompt_at = ? WHERE id = ?").run(Date.now(), testTeamId);
+    const cooldownReq = new NextRequest(`http://localhost:3000/api/teams/${testTeamId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({ message: "Blocked by cooldown" }),
+    });
+    const cooldownRes = await chatRoute.POST(cooldownReq, { params: Promise.resolve({ teamId: testTeamId }) });
+    assert.equal(cooldownRes.status, 429);
+
+    const teamAfterCooldown = dbModule.getTeamById(testTeamId)!;
+    assert.equal(teamAfterCooldown.prompt_count, initialPromptCount);
+
+    // 2. Blocked when locked
+    dbModule.db.prepare("UPDATE teams SET is_locked = 1, last_prompt_at = 0 WHERE id = ?").run(testTeamId);
+    const lockedReq = new NextRequest(`http://localhost:3000/api/teams/${testTeamId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({ message: "Blocked by lock" }),
+    });
+    const lockedRes = await chatRoute.POST(lockedReq, { params: Promise.resolve({ teamId: testTeamId }) });
+    assert.equal(lockedRes.status, 403);
+
+    const teamAfterLocked = dbModule.getTeamById(testTeamId)!;
+    assert.equal(teamAfterLocked.prompt_count, initialPromptCount);
+
+    // Reset lock
+    dbModule.db.prepare("UPDATE teams SET is_locked = 0, strike_count = 0 WHERE id = ?").run(testTeamId);
+  });
+
   it("prevents deletion of root index.html via path variations and blocks path traversal in DELETE", async () => {
     // 1. Path variation: ./index.html
     const req1 = new NextRequest(`http://localhost:3000/api/teams/${testTeamId}/files?filename=./index.html`, {

@@ -68,11 +68,14 @@ export async function POST(
       return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
     }
 
-    // 1. Record user prompt in database (increments team prompt_count)
-    recordPrompt(teamId, "user", message);
+    // 1. Fetch prior conversation history from DB
+    const existingHistory = getChatHistory(teamId);
 
-    // 2. Fetch full conversation history from DB
-    const allHistory = getChatHistory(teamId);
+    // 2. Include current user prompt in history for model context
+    const fullHistory = [
+      ...existingHistory,
+      { role: "user" as const, content: message },
+    ];
 
     // 3. Estimate tokens & prune history FIFO according to configured context window budget
     const systemPrompt =
@@ -81,12 +84,13 @@ export async function POST(
     const contextWindow = Number(process.env.LLM_CONTEXT_WINDOW_TOKENS || 4096);
     const maxOutput = Number(process.env.LLM_MAX_OUTPUT_TOKENS || 1024);
 
-    const prunedPayload = pruneChatHistory(systemPrompt, allHistory, contextWindow, maxOutput);
+    const prunedPayload = pruneChatHistory(systemPrompt, fullHistory, contextWindow, maxOutput);
 
     // 4. Query vLLM (or fallback offline mock if unreachable)
     const reply = await queryVLLM(prunedPayload);
 
-    // 5. Record assistant response in database
+    // 5. Success! Now record user prompt (which increments prompt_count) and assistant response
+    recordPrompt(teamId, "user", message);
     const assistantRecord = recordPrompt(teamId, "assistant", reply);
 
     const updatedTeam = getTeamById(teamId);
