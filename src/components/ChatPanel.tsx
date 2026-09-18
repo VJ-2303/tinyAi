@@ -143,11 +143,6 @@ export function ChatPanel({
 
   return (
     <div className="h-full flex flex-col bg-zinc-950 overflow-hidden select-none">
-      {/* Banner warning */}
-      <div className="bg-amber-950/40 border-b border-amber-900/30 px-3 py-1 text-[10px] font-mono text-amber-300/80 shrink-0">
-        <span>⚠ Each message adds +1 to your team&apos;s prompt score.</span>
-      </div>
-
       {/* Messages list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {history.length === 0 ? (
