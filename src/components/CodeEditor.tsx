@@ -100,7 +100,7 @@ export function CodeEditor({
                 onClick={() => onSelectFile(f.filename)}
                 className={`h-7 px-2.5 rounded-t text-xs font-mono flex items-center space-x-1.5 transition-colors cursor-pointer shrink-0 ${
                   isActive
-                    ? "bg-zinc-950 text-zinc-100 border-t-2 border-emerald-500 font-medium"
+                    ? "bg-zinc-950 text-zinc-100 border-t-2 border-zinc-200 font-medium"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                 }`}
               >
