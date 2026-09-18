@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { FileCode, ListTodo, Plus, Trash2, CheckCircle2, ChevronRight, File } from "lucide-react";
+import { FileCode, ListTodo, Plus, Trash2, CheckCircle2, File } from "lucide-react";
 import type { Task, FileRecord } from "@/lib/db";
 
 interface LeftPanelProps {

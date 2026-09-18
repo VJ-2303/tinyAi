@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { RotateCw, AlertCircle, X, ExternalLink } from "lucide-react";
+import { RotateCw, AlertCircle, X } from "lucide-react";
 import type { FileRecord } from "@/lib/db";
 
 interface PreviewPanelProps {
@@ -48,12 +48,6 @@ export function PreviewPanel({ files, runTrigger }: PreviewPanelProps) {
 
     const cssFiles = files.filter((f) => f.filename.endsWith(".css"));
     const jsFiles = files.filter((f) => f.filename.endsWith(".js"));
-
-    // Combine all CSS
-    const combinedCss = cssFiles.map((f) => `/* ${f.filename} */\n${f.content}`).join("\n");
-
-    // Combine all JS
-    const combinedJs = jsFiles.map((f) => `// ${f.filename}\n${f.content}`).join("\n");
 
     // Error capture harness (runtime errors + unhandled promise rejections)
     const errorCatcherScript = `

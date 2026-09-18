@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Play, Code, MessageSquare, AlertTriangle, RotateCw, Copy, Check, Unlock, ExternalLink } from "lucide-react";
+import { X, Play, Code, MessageSquare, AlertTriangle, RotateCw, Copy, Check, Unlock } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import type { Team, FileRecord, PromptRecord, Violation } from "@/lib/db";
 
@@ -44,8 +44,6 @@ export function AdminInspectModal({
     const indexHtml = files.find((f) => f.filename === "index.html")?.content || "<h3>No index.html</h3>";
     const cssFiles = files.filter((f) => f.filename.endsWith(".css"));
     const jsFiles = files.filter((f) => f.filename.endsWith(".js"));
-
-    const combinedCss = cssFiles.map((f) => f.content).join("\n");
 
     const errorCatcherScript = `
 <script>
@@ -289,7 +287,7 @@ export function AdminInspectModal({
                   key={gameReloadKey}
                   title="Team Game"
                   srcDoc={bundledHtml}
-                  sandbox="allow-scripts allow-modals"
+                  sandbox="allow-scripts allow-modals allow-same-origin"
                   className="w-full h-full border-none"
                 />
               </div>

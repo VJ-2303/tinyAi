@@ -379,7 +379,13 @@ export function registerOrResumeTeam(name: string): { team: Team; isNew: boolean
     return { team: existing, isNew: false };
   }
 
-  const id = slugifyTeamName(trimmed);
+  const baseId = slugifyTeamName(trimmed);
+  let id = baseId;
+  let counter = 1;
+  while (getTeamById(id)) {
+    id = `${baseId}-${counter++}`;
+  }
+
   db.prepare(`
     INSERT INTO teams (id, name, prompt_count, strike_count, is_locked, last_prompt_at, created_at, last_active_at)
     VALUES (?, ?, 0, 0, 0, 0, ?, ?)
@@ -481,6 +487,9 @@ export function upsertFile(teamId: string, filename: string, content: string): F
 
 export function deleteFile(teamId: string, filename: string): boolean {
   const cleanFilename = filename.trim().replace(/^(\.\/|\/)+/, "");
+  if (cleanFilename === "index.html") {
+    return false;
+  }
   const res = db.prepare("DELETE FROM files WHERE team_id = ? AND filename = ?").run(teamId, cleanFilename);
   touchTeamActive(teamId);
   return res.changes > 0;

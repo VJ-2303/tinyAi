@@ -13,7 +13,6 @@ process.env.MAX_PROCTORING_STRIKES = "3";
 process.env.LLM_CONTEXT_WINDOW_TOKENS = "250"; // low window to test pruning
 process.env.LLM_MAX_OUTPUT_TOKENS = "50";
 
-let dbModule: typeof import("../src/lib/db");
 let statusRoute: typeof import("../src/app/api/competition/status/route");
 let joinRoute: typeof import("../src/app/api/teams/join/route");
 let filesRoute: typeof import("../src/app/api/teams/[teamId]/files/route");
@@ -35,7 +34,6 @@ describe("Full Event Lifecycle End-to-End Simulation", () => {
       }
     }
 
-    dbModule = await import("../src/lib/db");
     statusRoute = await import("../src/app/api/competition/status/route");
     joinRoute = await import("../src/app/api/teams/join/route");
     filesRoute = await import("../src/app/api/teams/[teamId]/files/route");

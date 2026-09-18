@@ -14,7 +14,6 @@ let authRoute: typeof import("../src/app/api/admin/auth/route");
 let compRoute: typeof import("../src/app/api/admin/competition/route");
 let tasksRoute: typeof import("../src/app/api/admin/tasks/route");
 let taskSingleRoute: typeof import("../src/app/api/admin/tasks/[taskId]/route");
-let teamsRoute: typeof import("../src/app/api/admin/teams/route");
 let teamSingleRoute: typeof import("../src/app/api/admin/teams/[teamId]/route");
 let teamUnlockRoute: typeof import("../src/app/api/admin/teams/[teamId]/unlock/route");
 
@@ -33,7 +32,6 @@ describe("Admin Site Bug Hunt Suite", () => {
     compRoute = await import("../src/app/api/admin/competition/route");
     tasksRoute = await import("../src/app/api/admin/tasks/route");
     taskSingleRoute = await import("../src/app/api/admin/tasks/[taskId]/route");
-    teamsRoute = await import("../src/app/api/admin/teams/route");
     teamSingleRoute = await import("../src/app/api/admin/teams/[teamId]/route");
     teamUnlockRoute = await import("../src/app/api/admin/teams/[teamId]/unlock/route");
   });

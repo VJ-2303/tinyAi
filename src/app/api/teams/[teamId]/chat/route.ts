@@ -50,6 +50,7 @@ export async function POST(
         return NextResponse.json(
           {
             error: check.reason || "Rate limit cooldown active",
+            remainingSeconds: check.remainingCooldown,
             remainingCooldown: check.remainingCooldown,
           },
           { status: 429 }

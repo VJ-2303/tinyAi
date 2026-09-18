@@ -12,7 +12,6 @@ process.env.MAX_PROCTORING_STRIKES = "3";
 process.env.LLM_CONTEXT_WINDOW_TOKENS = "500";
 process.env.LLM_MAX_OUTPUT_TOKENS = "100";
 
-let dbModule: typeof import("../src/lib/db");
 let statusRoute: typeof import("../src/app/api/competition/status/route");
 let joinRoute: typeof import("../src/app/api/teams/join/route");
 let filesRoute: typeof import("../src/app/api/teams/[teamId]/files/route");
@@ -22,7 +21,6 @@ let adminAuthRoute: typeof import("../src/app/api/admin/auth/route");
 let adminCompRoute: typeof import("../src/app/api/admin/competition/route");
 let adminTasksRoute: typeof import("../src/app/api/admin/tasks/route");
 let adminSingleTaskRoute: typeof import("../src/app/api/admin/tasks/[taskId]/route");
-let adminTeamsRoute: typeof import("../src/app/api/admin/teams/route");
 let adminSingleTeamRoute: typeof import("../src/app/api/admin/teams/[teamId]/route");
 let adminUnlockRoute: typeof import("../src/app/api/admin/teams/[teamId]/unlock/route");
 
@@ -34,7 +32,6 @@ describe("API Routes Integration Tests", () => {
       }
     }
 
-    dbModule = await import("../src/lib/db");
     statusRoute = await import("../src/app/api/competition/status/route");
     joinRoute = await import("../src/app/api/teams/join/route");
     filesRoute = await import("../src/app/api/teams/[teamId]/files/route");
@@ -44,7 +41,6 @@ describe("API Routes Integration Tests", () => {
     adminCompRoute = await import("../src/app/api/admin/competition/route");
     adminTasksRoute = await import("../src/app/api/admin/tasks/route");
     adminSingleTaskRoute = await import("../src/app/api/admin/tasks/[taskId]/route");
-    adminTeamsRoute = await import("../src/app/api/admin/teams/route");
     adminSingleTeamRoute = await import("../src/app/api/admin/teams/[teamId]/route");
     adminUnlockRoute = await import("../src/app/api/admin/teams/[teamId]/unlock/route");
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, Lock, Maximize2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Lock, Maximize2 } from "lucide-react";
 
 interface ProctoringOverlayProps {
   isLockedByStrikes: boolean;

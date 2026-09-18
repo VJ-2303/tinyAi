@@ -108,11 +108,16 @@ export async function DELETE(
       return NextResponse.json({ error: "Filename query parameter required" }, { status: 400 });
     }
 
-    if (filename === "index.html") {
+    const cleanFilename = filename.trim().replace(/^(\.\/|\/)+/, "");
+    if (!cleanFilename || cleanFilename.includes("..") || cleanFilename.startsWith("/")) {
+      return NextResponse.json({ error: "Invalid filename path" }, { status: 400 });
+    }
+
+    if (cleanFilename === "index.html") {
       return NextResponse.json({ error: "Cannot delete root index.html file" }, { status: 400 });
     }
 
-    const success = deleteFile(teamId, filename);
+    const success = deleteFile(teamId, cleanFilename);
     return NextResponse.json({ success });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";

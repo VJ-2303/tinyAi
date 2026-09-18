@@ -38,11 +38,20 @@ export default function AdminPage() {
 
   // 1. Initial auth check from sessionStorage
   useEffect(() => {
-    const savedPin = sessionStorage.getItem("tinyai_admin_pin");
-    if (savedPin) {
-      setAdminPin(savedPin);
-    }
-    setAuthChecked(true);
+    let ignore = false;
+    const checkAuth = async () => {
+      const savedPin = sessionStorage.getItem("tinyai_admin_pin");
+      if (!ignore) {
+        if (savedPin) {
+          setAdminPin(savedPin);
+        }
+        setAuthChecked(true);
+      }
+    };
+    checkAuth();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleLogin = async (pin: string) => {
@@ -233,7 +242,7 @@ export default function AdminPage() {
     });
 
     if (res.ok) {
-      const data = await res.json();
+      await res.json();
       setTeams((prev) =>
         prev.map((t) => (t.id === teamId ? { ...t, is_locked: 0, strike_count: 0 } : t))
       );

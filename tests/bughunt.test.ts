@@ -12,6 +12,7 @@ let dbModule: typeof import("../src/lib/db");
 let filesRoute: typeof import("../src/app/api/teams/[teamId]/files/route");
 let teamRoute: typeof import("../src/app/api/teams/[teamId]/route");
 let chatRoute: typeof import("../src/app/api/teams/[teamId]/chat/route");
+let violationsRoute: typeof import("../src/app/api/teams/[teamId]/violations/route");
 const testTeamId = "bughunt-team";
 
 describe("Bug Hunt Verification Suite", () => {
@@ -28,6 +29,7 @@ describe("Bug Hunt Verification Suite", () => {
     filesRoute = await import("../src/app/api/teams/[teamId]/files/route");
     teamRoute = await import("../src/app/api/teams/[teamId]/route");
     chatRoute = await import("../src/app/api/teams/[teamId]/chat/route");
+    violationsRoute = await import("../src/app/api/teams/[teamId]/violations/route");
 
     dbModule.registerOrResumeTeam("BugHunt Team");
     dbModule.startCompetition(120);
@@ -93,5 +95,64 @@ describe("Bug Hunt Verification Suite", () => {
 
     const teamAfter = dbModule.getTeamById(testTeamId)!;
     assert.equal(teamAfter.prompt_count, initialPromptCount);
+  });
+
+  it("prevents deletion of root index.html via path variations and blocks path traversal in DELETE", async () => {
+    // 1. Path variation: ./index.html
+    const req1 = new NextRequest(`http://localhost:3000/api/teams/${testTeamId}/files?filename=./index.html`, {
+      method: "DELETE",
+    });
+    const res1 = await filesRoute.DELETE(req1, { params: Promise.resolve({ teamId: testTeamId }) });
+    assert.equal(res1.status, 400);
+
+    // 2. Path traversal in DELETE: ../secret.txt
+    const req2 = new NextRequest(`http://localhost:3000/api/teams/${testTeamId}/files?filename=../secret.txt`, {
+      method: "DELETE",
+    });
+    const res2 = await filesRoute.DELETE(req2, { params: Promise.resolve({ teamId: testTeamId }) });
+    assert.equal(res2.status, 400);
+    const data2 = await res2.json();
+    assert.match(data2.error, /invalid filename path/i);
+
+    // 3. Direct dbModule.deleteFile on index.html returns false
+    dbModule.upsertFile(testTeamId, "index.html", "<h1>test</h1>");
+    const dbDelResult = dbModule.deleteFile(testTeamId, "index.html");
+    assert.equal(dbDelResult, false);
+    const files = dbModule.getTeamFiles(testTeamId);
+    assert.ok(files.some((f) => f.filename === "index.html"));
+  });
+
+  it("proctoring violation route ignores strikes when workstation is already locked", async () => {
+    // Lock team
+    dbModule.recordViolation(testTeamId, "FOCUS_LOST");
+    dbModule.recordViolation(testTeamId, "FOCUS_LOST");
+    dbModule.recordViolation(testTeamId, "FOCUS_LOST");
+
+    const team = dbModule.getTeamById(testTeamId)!;
+    assert.equal(team.is_locked, 1);
+    const strikesBefore = team.strike_count;
+
+    // Send violation while locked
+    const req = new NextRequest(`http://localhost:3000/api/teams/${testTeamId}/violations`, {
+      method: "POST",
+      body: JSON.stringify({ reason: "TAB_SWITCH" }),
+    });
+    const res = await violationsRoute.POST(req, { params: Promise.resolve({ teamId: testTeamId }) });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.match(data.message, /already locked/i);
+
+    const teamAfter = dbModule.getTeamById(testTeamId)!;
+    assert.equal(teamAfter.strike_count, strikesBefore);
+
+    // Unlock team for cleanup
+    dbModule.unlockTeam(testTeamId);
+  });
+
+  it("handles team slug collisions gracefully without database constraint errors", () => {
+    const t1 = dbModule.registerOrResumeTeam("Code Wizards!");
+    const t2 = dbModule.registerOrResumeTeam("Code-Wizards");
+    assert.notEqual(t1.team.id, t2.team.id);
+    assert.ok(t2.team.id.startsWith("code-wizards"));
   });
 });

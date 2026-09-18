@@ -74,13 +74,24 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
-    const savedName = localStorage.getItem("tinyai_team_name");
-    if (savedName) {
-      joinTeam(savedName).catch(() => {
-        localStorage.removeItem("tinyai_team_name");
-        localStorage.removeItem("tinyai_team_id");
-      });
-    }
+    let ignore = false;
+    const restoreSession = async () => {
+      const savedName = localStorage.getItem("tinyai_team_name");
+      if (savedName && !ignore) {
+        try {
+          await joinTeam(savedName);
+        } catch {
+          if (!ignore) {
+            localStorage.removeItem("tinyai_team_name");
+            localStorage.removeItem("tinyai_team_id");
+          }
+        }
+      }
+    };
+    restoreSession();
+    return () => {
+      ignore = true;
+    };
   }, [joinTeam]);
 
   // Polling guard
@@ -90,6 +101,7 @@ export default function WorkspacePage() {
   // 2. State Synchronization Short Polling (every 2.5s)
   // --------------------------------------------------------------------------
   const teamId = team?.id;
+  const isTeamLocked = Boolean(team?.is_locked);
 
   const fetchStatus = useCallback(async () => {
     if (isPollingRef.current) return;
@@ -115,8 +127,16 @@ export default function WorkspacePage() {
         };
       });
 
+      // Prompt fullscreen if transitioning to RUNNING
+      if (prevStatusRef.current !== "RUNNING" && data.status === "RUNNING") {
+        if (!document.fullscreenElement) {
+          setNeedsFullscreen(true);
+        }
+      }
+      prevStatusRef.current = data.status;
+
       // Only poll team status if workstation is currently locked (to detect organizer unlock)
-      if (teamId && team?.is_locked) {
+      if (teamId && isTeamLocked) {
         const teamRes = await fetch(`/api/teams/${teamId}`);
         if (teamRes.ok) {
           const teamData = await teamRes.json();
@@ -147,7 +167,7 @@ export default function WorkspacePage() {
     } finally {
       isPollingRef.current = false;
     }
-  }, [teamId, team?.is_locked]);
+  }, [teamId, isTeamLocked]);
 
   useEffect(() => {
     let isMounted = true;
@@ -193,14 +213,16 @@ export default function WorkspacePage() {
     }
   }, [enterFullscreen]);
 
-  // When competition transitions to RUNNING, trigger fullscreen requirement
+  // Smooth local 1-second timer tick while status is RUNNING
   useEffect(() => {
-    if (prevStatusRef.current !== "RUNNING" && competition.status === "RUNNING") {
-      if (!document.fullscreenElement) {
-        setNeedsFullscreen(true);
-      }
-    }
-    prevStatusRef.current = competition.status;
+    if (competition.status !== "RUNNING") return;
+    const timer = setInterval(() => {
+      setCompetition((prev) => {
+        if (prev.status !== "RUNNING" || prev.remaining_seconds <= 0) return prev;
+        return { ...prev, remaining_seconds: Math.max(0, prev.remaining_seconds - 1) };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
   }, [competition.status]);
 
   // Proctoring debounce guard to avoid cascading strikes on single alt-tab

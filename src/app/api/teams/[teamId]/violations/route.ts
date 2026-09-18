@@ -14,11 +14,19 @@ export async function POST(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
-    // Only enforce proctoring strikes while competition is RUNNING
+    // Only enforce proctoring strikes while competition is RUNNING and team is unlocked
     const state = getCompetitionState();
     if (state.status !== "RUNNING") {
       return NextResponse.json({
         message: "Proctoring violation ignored: competition is not running",
+        strike_count: team.strike_count,
+        is_locked: team.is_locked,
+      });
+    }
+
+    if (team.is_locked) {
+      return NextResponse.json({
+        message: "Proctoring violation ignored: workstation is already locked",
         strike_count: team.strike_count,
         is_locked: team.is_locked,
       });
