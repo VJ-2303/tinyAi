@@ -188,11 +188,19 @@ export default function AdminPage() {
   };
 
   // 4. Task Actions
-  const handleCreateTask = async (title: string, descriptionMarkdown: string) => {
+  const handleCreateTask = async (
+    title: string,
+    descriptionMarkdown: string,
+    revealAfterMinutes?: number | null
+  ) => {
     const res = await adminFetch("/api/admin/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description_markdown: descriptionMarkdown }),
+      body: JSON.stringify({
+        title,
+        description_markdown: descriptionMarkdown,
+        reveal_after_minutes: revealAfterMinutes,
+      }),
     });
 
     if (res.ok) {
@@ -203,7 +211,12 @@ export default function AdminPage() {
 
   const handleUpdateTask = async (
     id: number,
-    updates: { title?: string; description_markdown?: string; is_revealed?: number }
+    updates: {
+      title?: string;
+      description_markdown?: string;
+      is_revealed?: number;
+      reveal_after_minutes?: number | null;
+    }
   ) => {
     const res = await adminFetch(`/api/admin/tasks/${id}`, {
       method: "PUT",
@@ -286,6 +299,12 @@ export default function AdminPage() {
           <Panel defaultSize="38%" minSize={300} maxSize={550}>
             <AdminTaskQueue
               tasks={tasks}
+              competitionStatus={competition.status}
+              elapsedSeconds={
+                (competition.status === "RUNNING" || competition.status === "PAUSED" || competition.status === "ENDED")
+                  ? Math.max(0, (competition.duration_minutes * 60) - competition.remaining_seconds)
+                  : -1
+              }
               onCreateTask={handleCreateTask}
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}

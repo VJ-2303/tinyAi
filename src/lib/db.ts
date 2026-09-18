@@ -21,6 +21,7 @@ export interface Task {
   description_markdown: string;
   is_revealed: number; // 0 or 1
   revealed_at: number | null;
+  reveal_after_minutes: number | null;
 }
 
 export interface Team {
@@ -109,10 +110,17 @@ function initDatabase(): DatabaseSync {
       title TEXT NOT NULL,
       description_markdown TEXT NOT NULL DEFAULT '',
       is_revealed INTEGER NOT NULL DEFAULT 0,
-      revealed_at INTEGER
+      revealed_at INTEGER,
+      reveal_after_minutes INTEGER DEFAULT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_tasks_revealed ON tasks(is_revealed, order_index);
   `);
+
+  // Ensure reveal_after_minutes exists if table was created in older version
+  const taskCols = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+  if (!taskCols.some((col) => col.name === "reveal_after_minutes")) {
+    db.exec("ALTER TABLE tasks ADD COLUMN reveal_after_minutes INTEGER DEFAULT NULL;");
+  }
 
   // 3. teams table
   db.exec(`
@@ -307,25 +315,54 @@ export function verifyAdminPin(pin: string): boolean {
 // Task Management Helpers
 // ----------------------------------------------------------------------------
 
-export function getTasks(revealedOnly = false): Task[] {
+export function getTasks(revealedOnly = false, elapsedSeconds?: number): Task[] {
   if (revealedOnly) {
-    return db.prepare("SELECT * FROM tasks WHERE is_revealed = 1 ORDER BY order_index ASC, id ASC").all() as unknown as Task[];
+    let rows: Task[];
+    if (typeof elapsedSeconds === "number" && elapsedSeconds >= 0) {
+      rows = db.prepare(`
+        SELECT * FROM tasks
+        WHERE is_revealed = 1
+           OR (reveal_after_minutes IS NOT NULL AND ? >= (reveal_after_minutes * 60))
+        ORDER BY order_index ASC, id ASC
+      `).all(elapsedSeconds) as unknown as Task[];
+    } else {
+      rows = db.prepare("SELECT * FROM tasks WHERE is_revealed = 1 ORDER BY order_index ASC, id ASC").all() as unknown as Task[];
+    }
+    return rows.map((t) => ({ ...t, is_revealed: 1 }));
   }
   return db.prepare("SELECT * FROM tasks ORDER BY order_index ASC, id ASC").all() as unknown as Task[];
 }
 
-export function createTask(title: string, descriptionMarkdown: string, orderIndex?: number): Task {
+export function createTask(
+  title: string,
+  descriptionMarkdown: string,
+  orderIndex?: number,
+  revealAfterMinutes?: number | null
+): Task {
   const nextOrder = (db.prepare("SELECT COALESCE(MAX(order_index), 0) + 1 as next_index FROM tasks").get() as { next_index: number }).next_index;
   const index = orderIndex ?? nextOrder;
+  const scheduleMin = typeof revealAfterMinutes === "number" && !isNaN(revealAfterMinutes) && revealAfterMinutes >= 0
+    ? Math.floor(revealAfterMinutes)
+    : null;
+
   const res = db.prepare(`
-    INSERT INTO tasks (order_index, title, description_markdown, is_revealed, revealed_at)
-    VALUES (?, ?, ?, 0, NULL)
-  `).run(index, title.trim(), descriptionMarkdown.trim());
+    INSERT INTO tasks (order_index, title, description_markdown, is_revealed, revealed_at, reveal_after_minutes)
+    VALUES (?, ?, ?, 0, NULL, ?)
+  `).run(index, title.trim(), descriptionMarkdown.trim(), scheduleMin);
 
   return db.prepare("SELECT * FROM tasks WHERE id = ?").get(res.lastInsertRowid) as unknown as Task;
 }
 
-export function updateTask(id: number, updates: { title?: string; description_markdown?: string; is_revealed?: number; order_index?: number }): Task | null {
+export function updateTask(
+  id: number,
+  updates: {
+    title?: string;
+    description_markdown?: string;
+    is_revealed?: number;
+    order_index?: number;
+    reveal_after_minutes?: number | null;
+  }
+): Task | null {
   const existing = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as unknown as Task | undefined;
   if (!existing) return null;
 
@@ -334,12 +371,15 @@ export function updateTask(id: number, updates: { title?: string; description_ma
   const orderIndex = updates.order_index ?? existing.order_index;
   const isRevealed = updates.is_revealed ?? existing.is_revealed;
   const revealedAt = isRevealed ? (existing.is_revealed ? existing.revealed_at : Date.now()) : null;
+  const revealAfterMinutes = updates.reveal_after_minutes !== undefined
+    ? (updates.reveal_after_minutes !== null && updates.reveal_after_minutes >= 0 ? Math.floor(updates.reveal_after_minutes) : null)
+    : existing.reveal_after_minutes;
 
   db.prepare(`
     UPDATE tasks
-    SET title = ?, description_markdown = ?, order_index = ?, is_revealed = ?, revealed_at = ?
+    SET title = ?, description_markdown = ?, order_index = ?, is_revealed = ?, revealed_at = ?, reveal_after_minutes = ?
     WHERE id = ?
-  `).run(title, description, orderIndex, isRevealed, revealedAt, id);
+  `).run(title, description, orderIndex, isRevealed, revealedAt, revealAfterMinutes, id);
 
   return db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as unknown as Task;
 }

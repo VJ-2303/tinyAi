@@ -24,11 +24,26 @@ export async function PUT(
       return NextResponse.json({ error: "Task title cannot be empty" }, { status: 400 });
     }
 
+    let revealAfterMinutes: number | null | undefined = undefined;
+    if (body?.reveal_after_minutes !== undefined) {
+      if (body.reveal_after_minutes === null || body.reveal_after_minutes === "") {
+        revealAfterMinutes = null;
+      } else {
+        const parsed = Number(body.reveal_after_minutes);
+        if (!isNaN(parsed) && parsed >= 0) {
+          revealAfterMinutes = Math.floor(parsed);
+        } else {
+          revealAfterMinutes = null;
+        }
+      }
+    }
+
     const updated = updateTask(id, {
       title: typeof body?.title === "string" ? body.title.trim() : undefined,
       description_markdown: typeof body?.description_markdown === "string" ? body.description_markdown.trim() : undefined,
       is_revealed: typeof body?.is_revealed === "number" ? body.is_revealed : undefined,
       order_index: typeof body?.order_index === "number" ? body.order_index : undefined,
+      reveal_after_minutes: revealAfterMinutes,
     });
 
     if (!updated) {

@@ -6,7 +6,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const state = getCompetitionState();
-    const revealedTasks = getTasks(true);
+    const elapsedSeconds = (state.status === "RUNNING" || state.status === "PAUSED" || state.status === "ENDED")
+      ? Math.max(0, (state.duration_minutes * 60) - state.remaining_seconds)
+      : -1;
+    const revealedTasks = getTasks(true, elapsedSeconds);
 
     return NextResponse.json({
       status: state.status,

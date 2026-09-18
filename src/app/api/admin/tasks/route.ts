@@ -29,11 +29,19 @@ export async function POST(req: NextRequest) {
     const description = typeof body?.description_markdown === "string" ? body.description_markdown : "";
     const orderIndex = typeof body?.order_index === "number" ? body.order_index : undefined;
 
+    let revealAfterMinutes: number | null = null;
+    if (typeof body?.reveal_after_minutes === "number" && !isNaN(body.reveal_after_minutes) && body.reveal_after_minutes >= 0) {
+      revealAfterMinutes = Math.floor(body.reveal_after_minutes);
+    } else if (typeof body?.reveal_after_minutes === "string" && body.reveal_after_minutes.trim() !== "" && !isNaN(Number(body.reveal_after_minutes))) {
+      const parsed = Number(body.reveal_after_minutes);
+      if (parsed >= 0) revealAfterMinutes = Math.floor(parsed);
+    }
+
     if (!title) {
       return NextResponse.json({ error: "Task title is required" }, { status: 400 });
     }
 
-    const task = createTask(title, description, orderIndex);
+    const task = createTask(title, description, orderIndex, revealAfterMinutes);
     return NextResponse.json({ task });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal Server Error";
