@@ -40,7 +40,7 @@ export function RightPanel({
             onClick={() => setActiveTab("preview")}
             className={`h-7 px-3 rounded-t flex items-center space-x-1.5 transition-colors cursor-pointer ${
               activeTab === "preview"
-                ? "bg-zinc-950 text-zinc-100 border-t-2 border-emerald-500 font-medium"
+                ? "bg-zinc-950 text-zinc-100 font-medium"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
@@ -52,7 +52,7 @@ export function RightPanel({
             onClick={() => setActiveTab("chat")}
             className={`h-7 px-3 rounded-t flex items-center space-x-1.5 transition-colors cursor-pointer ${
               activeTab === "chat"
-                ? "bg-zinc-950 text-zinc-100 border-t-2 border-zinc-200 font-medium"
+                ? "bg-zinc-950 text-zinc-100 font-medium"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >

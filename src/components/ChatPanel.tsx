@@ -143,18 +143,6 @@ export function ChatPanel({
 
   return (
     <div className="h-full flex flex-col bg-zinc-950 overflow-hidden select-none">
-      {/* Chat header */}
-      <div className="h-9 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between px-3 shrink-0">
-        <div className="flex items-center space-x-2 text-xs font-mono text-zinc-300">
-          <span className="font-semibold text-zinc-200 uppercase tracking-wider text-[11px]">
-            AI TERMINAL // &lt;1B MODEL
-          </span>
-        </div>
-        <span className="text-[10px] font-mono text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-800">
-          Score: {promptCount} prompts
-        </span>
-      </div>
-
       {/* Banner warning */}
       <div className="bg-amber-950/40 border-b border-amber-900/30 px-3 py-1 text-[10px] font-mono text-amber-300/80 shrink-0">
         <span>⚠ Each message adds +1 to your team&apos;s prompt score.</span>
@@ -181,9 +169,6 @@ export function ChatPanel({
                       : "bg-zinc-900 text-zinc-300 border border-zinc-800"
                   }`}
                 >
-                  <div className="text-[10px] font-mono text-zinc-500 mb-1 uppercase tracking-wider font-semibold">
-                    {isUser ? "PROMPT" : "MODEL"}
-                  </div>
                   {isUser ? msg.content : renderMessageContent(msg.content, idx)}
                 </div>
               </div>
