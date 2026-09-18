@@ -55,6 +55,13 @@ function sampleSystemUsage(pid: number) {
 
 function findNextServerPid(): number {
   try {
+    const urlObj = new URL(SERVER_URL);
+    const port = urlObj.port || "3000";
+    const out = execSync(`lsof -ti :${port} -sTCP:LISTEN | head -n 1`, { encoding: "utf-8" }).trim();
+    const pid = parseInt(out, 10);
+    if (!isNaN(pid) && pid > 0) return pid;
+  } catch {}
+  try {
     const out = execSync("pgrep -f 'next-server' | head -n 1", { encoding: "utf-8" }).trim();
     const pid = parseInt(out, 10);
     return isNaN(pid) ? process.pid : pid;
