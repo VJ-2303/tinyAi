@@ -61,18 +61,45 @@ describe("LLM Module & Response Parser (src/lib/llm.ts)", () => {
       assert.equal(pruned[3].content, "Help me with canvas");
     });
 
-    it("prunes oldest messages first (FIFO) when context window is exceeded", () => {
-      const history = [
-        { role: "user" as const, content: "Old message 1 ".repeat(40) }, // ~160 tokens
-        { role: "assistant" as const, content: "Old message 2 ".repeat(40) }, // ~160 tokens
-        { role: "user" as const, content: "New message 3" }, // ~4 tokens
-      ];
-      // Set a tiny context window where budget allows only system + latest message
-      const pruned = pruneChatHistory(systemPrompt, history, 350, 100);
-      assert.ok(pruned.length < 4);
+    it("prunes down to 50% of token budget when context gets full", () => {
+      // 10 messages of ~48 tokens each = ~480 tokens
+      const history = Array.from({ length: 10 }, (_, i) => ({
+        role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+        content: `Message ${i + 1} with repeated test content words for token length. `.repeat(4),
+      }));
+
+      // Set contextWindow such that total tokens (~480) exceeds availableBudget (~292)
+      // availableBudget = Math.max(200, 500 - 100 - systemTokens(~8) - safetyBuffer(100)) = ~292 tokens
+      const pruned = pruneChatHistory(systemPrompt, history, 500, 100);
+
+      // System prompt always at index 0
       assert.equal(pruned[0].role, "system");
-      // The newest message must be preserved
-      assert.equal(pruned[pruned.length - 1].content, "New message 3");
+      assert.equal(pruned[0].content, systemPrompt);
+
+      // Should have pruned older messages
+      assert.ok(pruned.length < history.length + 1);
+
+      // Newest message must be preserved
+      assert.equal(pruned[pruned.length - 1].content, history[history.length - 1].content);
+
+      // Pruned history messages (excluding system) must consume <= 50% of availableBudget (~146 tokens)
+      const keptHistory = pruned.slice(1);
+      const keptTokens = keptHistory.reduce((sum, m) => sum + estimateTokens(m.content) + 4, 0);
+      const availableBudget = Math.max(200, 500 - 100 - estimateTokens(systemPrompt) - 100);
+      assert.ok(keptTokens <= Math.floor(availableBudget * 0.5));
+    });
+
+    it("preserves newest message even if it alone exceeds 50% target budget", () => {
+      const history = [
+        { role: "user" as const, content: "Old message 1 ".repeat(40) }, // ~120 tokens
+        { role: "user" as const, content: "Huge latest prompt ".repeat(35) }, // ~105 tokens
+      ];
+      // availableBudget = 200, 50% budget = 100. Total tokens ~233 > 200 (full!).
+      // Latest message is ~109 tokens > 100 (50% target budget).
+      const pruned = pruneChatHistory(systemPrompt, history, 350, 100);
+      assert.equal(pruned[0].role, "system");
+      assert.equal(pruned.length, 2); // system + latest message
+      assert.equal(pruned[1].content, history[1].content);
     });
   });
 

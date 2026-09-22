@@ -28,18 +28,40 @@ export function pruneChatHistory(
     return [{ role: "system", content: systemPrompt }];
   }
 
-  // Work backwards from newest messages to keep as many recent messages as fit in budget
+  // Precompute token counts for each message
+  const messageTokenCounts = history.map((msg) => estimateTokens(msg.content) + 4);
+  const totalHistoryTokens = messageTokenCounts.reduce((sum, count) => sum + count, 0);
+
+  // If entire history fits in available budget, keep everything
+  if (totalHistoryTokens <= availableBudget) {
+    return [
+      { role: "system", content: systemPrompt },
+      ...history,
+    ];
+  }
+
+  // Context is full: prune down to 50% of available token budget to create headroom
+  const targetBudget = Math.floor(availableBudget * 0.5);
+
   const keptMessages: { role: "user" | "assistant"; content: string }[] = [];
   let currentTokens = 0;
 
   for (let i = history.length - 1; i >= 0; i--) {
     const msg = history[i];
-    const msgTokens = estimateTokens(msg.content) + 4; // account for message formatting overhead
-    if (keptMessages.length === 0 || currentTokens + msgTokens <= availableBudget) {
+    const msgTokens = messageTokenCounts[i];
+
+    // Always preserve at least the latest message
+    if (keptMessages.length === 0) {
+      keptMessages.unshift(msg);
+      currentTokens += msgTokens;
+      continue;
+    }
+
+    if (currentTokens + msgTokens <= targetBudget) {
       keptMessages.unshift(msg);
       currentTokens += msgTokens;
     } else {
-      // Exceeded budget, remaining older messages are pruned
+      // Exceeded 50% target budget, stop adding older messages
       break;
     }
   }
