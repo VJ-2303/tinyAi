@@ -44,6 +44,38 @@ export function pruneChatHistory(
   ];
 }
 
+export interface RawModelMessage {
+  content?: string | null;
+  reasoning_content?: string | null;
+  reasoning?: string | null;
+}
+
+export function extractModelReply(message?: RawModelMessage | null): string {
+  if (!message) return "";
+
+  // 1. Prefer final synthesized answer content
+  let text = typeof message.content === "string" ? message.content.trim() : "";
+
+  // 2. If content has raw <think>...</think> tags, strip them
+  if (text.includes("<think>")) {
+    const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    text = stripped || text.replace(/<\/?think>/gi, "").trim();
+  }
+
+  // 3. Fallback to reasoning_content or reasoning if content is empty
+  if (!text) {
+    const reasoning =
+      typeof message.reasoning_content === "string"
+        ? message.reasoning_content.trim()
+        : typeof message.reasoning === "string"
+        ? message.reasoning.trim()
+        : "";
+    text = reasoning;
+  }
+
+  return text;
+}
+
 export async function queryVLLM(messages: ChatMessage[]): Promise<string> {
   const baseUrl = process.env.VLLM_BASE_URL || "http://localhost:8000/v1";
   const model = process.env.VLLM_MODEL || "Qwen/Qwen2.5-Coder-0.5B-Instruct";
@@ -74,7 +106,8 @@ export async function queryVLLM(messages: ChatMessage[]): Promise<string> {
     }
 
     const data = await res.json();
-    const reply = data?.choices?.[0]?.message?.content;
+    const msg = data?.choices?.[0]?.message;
+    const reply = extractModelReply(msg);
     if (!reply) {
       throw new Error("No response content received from vLLM");
     }

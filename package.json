@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npm run test:db && npm run test:perf && npm run test:api && npm run test:e2e && npm run test:bughunt && npm run test:admin-bughunt && npm run test:schedule",
+    "test": "npm run test:db && npm run test:perf && npm run test:api && npm run test:e2e && npm run test:bughunt && npm run test:admin-bughunt && npm run test:schedule && npm run test:llm",
     "test:db": "tsx --test tests/db.test.ts",
     "test:perf": "tsx --test tests/db-performance.test.ts",
     "test:api": "tsx --test tests/api.test.ts",
@@ -15,7 +15,9 @@
     "test:bughunt": "tsx --test tests/bughunt.test.ts",
     "test:admin-bughunt": "tsx --test tests/admin-bughunt.test.ts",
     "test:schedule": "tsx --test tests/task-schedule.test.ts",
-    "test:load": "tsx scripts/load-test-50-teams.ts"
+    "test:llm": "tsx --test tests/llm.test.ts",
+    "test:load": "tsx scripts/load-test-50-teams.ts",
+    "benchmark:llm": "tsx scripts/benchmark-llm.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.20",
