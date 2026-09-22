@@ -1,11 +1,17 @@
+import { estimateTokenCount } from "tokenx";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
 
+/**
+ * Estimates token count using tokenx (~2kB, zero-deps, calibrated against BPE tokenizers).
+ * Handles code syntax, whitespace, punctuation, CJK, and emojis accurately.
+ */
 export function estimateTokens(text: string): number {
-  if (!text) return 0;
-  return Math.ceil(text.length / 4);
+  if (!text || typeof text !== "string") return 0;
+  return estimateTokenCount(text);
 }
 
 export function pruneChatHistory(

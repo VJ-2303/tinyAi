@@ -13,12 +13,27 @@ describe("LLM Module & Response Parser (src/lib/llm.ts)", () => {
     it("returns 0 for empty or falsy text", () => {
       assert.equal(estimateTokens(""), 0);
       assert.equal(estimateTokens(null as unknown as string), 0);
+      assert.equal(estimateTokens(undefined as unknown as string), 0);
     });
 
-    it("estimates tokens at roughly 4 chars per token ceiling", () => {
-      assert.equal(estimateTokens("abcd"), 1);
-      assert.equal(estimateTokens("abcde"), 2);
-      assert.equal(estimateTokens("Hello, world! This is a test."), 8);
+    it("accurately estimates English text and punctuation", () => {
+      // "Hello, world! This is a test." is 9 tokens in BPE (cl100k/o200k)
+      const count = estimateTokens("Hello, world! This is a test.");
+      assert.ok(count >= 7 && count <= 10);
+    });
+
+    it("accurately estimates code tokens (braces, symbols, keywords)", () => {
+      const code = "function updatePlayer(player, dt) { if (player.x > 100) return; }";
+      const count = estimateTokens(code);
+      assert.ok(count >= 18 && count <= 23);
+    });
+
+    it("accurately handles multibyte characters (emojis, CJK)", () => {
+      const emojiCount = estimateTokens("🚀🤖🔥");
+      assert.ok(emojiCount >= 3 && emojiCount <= 6);
+
+      const cjkCount = estimateTokens("你好世界");
+      assert.ok(cjkCount >= 3 && cjkCount <= 6);
     });
   });
 
