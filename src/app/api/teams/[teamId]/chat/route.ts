@@ -5,7 +5,7 @@ import {
   recordPrompt,
   canTeamPrompt,
 } from "@/lib/db";
-import { pruneChatHistory, queryVLLM } from "@/lib/llm";
+import { pruneChatHistory, queryVLLM, streamVLLM } from "@/lib/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +86,56 @@ export async function POST(
 
     const prunedPayload = pruneChatHistory(systemPrompt, fullHistory, contextWindow, maxOutput);
 
-    // 4. Query vLLM (or fallback offline mock if unreachable)
+    const isStream = body?.stream === true;
+
+    if (isStream) {
+      const encoder = new TextEncoder();
+      const customReadable = new ReadableStream({
+        async start(controller) {
+          try {
+            let fullReply = "";
+            for await (const token of streamVLLM(prunedPayload)) {
+              fullReply += token;
+              const sseLine = `data: ${JSON.stringify({ token })}\n\n`;
+              controller.enqueue(encoder.encode(sseLine));
+            }
+
+            // Record user prompt and assistant response in DB
+            recordPrompt(teamId, "user", message);
+            const assistantRecord = recordPrompt(
+              teamId,
+              "assistant",
+              fullReply || "No response generated."
+            );
+            const updatedTeam = getTeamById(teamId);
+
+            const doneLine = `data: ${JSON.stringify({
+              done: true,
+              message: assistantRecord,
+              prompt_count: updatedTeam?.prompt_count || team.prompt_count + 1,
+              remainingCooldown: cooldownSeconds,
+            })}\n\n`;
+            controller.enqueue(encoder.encode(doneLine));
+            controller.close();
+          } catch (err: unknown) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            const errLine = `data: ${JSON.stringify({ error: errorMsg })}\n\n`;
+            controller.enqueue(encoder.encode(errLine));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(customReadable, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
+    // 4. Non-streaming query vLLM (or fallback offline mock if unreachable)
     const reply = await queryVLLM(prunedPayload);
 
     // 5. Success! Now record user prompt (which increments prompt_count) and assistant response

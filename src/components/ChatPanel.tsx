@@ -207,6 +207,9 @@ export function ChatPanel({
         ) : (
           history.map((msg, idx) => {
             const isUser = msg.role === "user";
+            // Don't render empty assistant bubble before first token arrives
+            if (!isUser && !msg.content) return null;
+
             const msgKey = `msg-${msg.id || idx}`;
             const isMsgCopied = copiedKey === msgKey;
 

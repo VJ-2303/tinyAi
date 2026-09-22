@@ -206,6 +206,38 @@ describe("API Routes Integration Tests", () => {
       assert.ok(data2.remainingCooldown > 0);
     });
 
+    it("streams chat response via SSE when stream=true", async () => {
+      // Register dedicated team to avoid cooldown from previous test
+      const joinReq = new NextRequest("http://localhost:3000/api/teams/join", {
+        method: "POST",
+        body: JSON.stringify({ name: "Streaming Warriors" }),
+      });
+      const joinRes = await joinRoute.POST(joinReq);
+      const joinData = await joinRes.json();
+      const streamTeamId = joinData.team.id;
+
+      const streamReq = new NextRequest(`http://localhost:3000/api/teams/${streamTeamId}/chat`, {
+        method: "POST",
+        body: JSON.stringify({ message: "Can you stream this game code?", stream: true }),
+      });
+      const streamRes = await chatRoute.POST(streamReq, { params: Promise.resolve({ teamId: streamTeamId }) });
+      assert.equal(streamRes.status, 200);
+      assert.match(streamRes.headers.get("content-type") || "", /text\/event-stream/);
+
+      const reader = streamRes.body?.getReader();
+      assert.ok(reader);
+      const decoder = new TextDecoder();
+      let streamOutput = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        streamOutput += decoder.decode(value);
+      }
+
+      assert.match(streamOutput, /data: /);
+      assert.match(streamOutput, /"done":true/);
+    });
+
     it("records proctoring violations and locks workstation on 3rd strike", async () => {
       // Strike 1
       const req1 = new NextRequest(`http://localhost:3000/api/teams/${teamId}/violations`, {

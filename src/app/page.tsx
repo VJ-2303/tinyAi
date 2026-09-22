@@ -397,7 +397,7 @@ export default function WorkspacePage() {
   const handleSendPrompt = async (message: string) => {
     if (!team) return;
 
-    // Optimistically append user message
+    // Optimistically append user message and streaming placeholder assistant message
     const tempUserMsg: PromptRecord = {
       id: Date.now(),
       team_id: team.id,
@@ -405,20 +405,31 @@ export default function WorkspacePage() {
       content: message,
       created_at: Date.now(),
     };
-    setChatHistory((prev) => [...prev, tempUserMsg]);
+    const tempAssistantId = Date.now() + 1;
+    const tempAssistantMsg: PromptRecord = {
+      id: tempAssistantId,
+      team_id: team.id,
+      role: "assistant",
+      content: "",
+      created_at: Date.now(),
+    };
+
+    setChatHistory((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
     setTeam((prev) => (prev ? { ...prev, prompt_count: prev.prompt_count + 1 } : null));
 
     try {
       const res = await fetch(`/api/teams/${team.id}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, stream: true }),
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        // Rollback optimistic message and prompt count on failure
-        setChatHistory((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+        const err = await res.json().catch(() => ({}));
+        // Rollback optimistic messages and prompt count on failure
+        setChatHistory((prev) =>
+          prev.filter((m) => m.id !== tempUserMsg.id && m.id !== tempAssistantId)
+        );
         setTeam((prev) => (prev ? { ...prev, prompt_count: Math.max(0, prev.prompt_count - 1) } : null));
         const errorWithCooldown = new Error(err.error || "Failed to get AI response") as Error & {
           remainingCooldown?: number;
@@ -429,10 +440,59 @@ export default function WorkspacePage() {
         throw errorWithCooldown;
       }
 
-      const data = await res.json();
-      setChatHistory((prev) => [...prev, data.message]);
-      if (typeof data.prompt_count === "number") {
-        setTeam((prev) => (prev ? { ...prev, prompt_count: data.prompt_count } : null));
+      const contentType = res.headers.get("content-type") || "";
+
+      if (contentType.includes("text/event-stream") && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulated = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+
+            try {
+              const data = JSON.parse(trimmed.slice(6));
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              if (data.token) {
+                accumulated += data.token;
+                setChatHistory((prev) =>
+                  prev.map((m) => (m.id === tempAssistantId ? { ...m, content: accumulated } : m))
+                );
+              }
+              if (data.done && data.message) {
+                setChatHistory((prev) =>
+                  prev.map((m) => (m.id === tempAssistantId ? data.message : m))
+                );
+                if (typeof data.prompt_count === "number") {
+                  setTeam((prev) => (prev ? { ...prev, prompt_count: data.prompt_count } : null));
+                }
+              }
+            } catch {
+              // Ignore incomplete SSE chunk
+            }
+          }
+        }
+      } else {
+        // Fallback for non-streaming response
+        const data = await res.json();
+        setChatHistory((prev) =>
+          prev.map((m) => (m.id === tempAssistantId ? data.message : m))
+        );
+        if (typeof data.prompt_count === "number") {
+          setTeam((prev) => (prev ? { ...prev, prompt_count: data.prompt_count } : null));
+        }
       }
     } catch (err) {
       throw err;

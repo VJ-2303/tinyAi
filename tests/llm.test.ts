@@ -5,6 +5,7 @@ import {
   pruneChatHistory,
   extractModelReply,
   queryVLLM,
+  streamVLLM,
   ChatMessage,
 } from "../src/lib/llm";
 
@@ -232,6 +233,103 @@ describe("LLM Module & Response Parser (src/lib/llm.ts)", () => {
       const reply = await queryVLLM([{ role: "user", content: "How do I make a sprite?" }]);
       assert.match(reply, /vLLM Offline Mode/);
       assert.match(reply, /How do I make a sprite\?/);
+    });
+  });
+
+  describe("5. Streaming streamVLLM (Final Response Only)", () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it("streams final response tokens while filtering out reasoning tokens", async () => {
+      // Mock SSE response with reasoning chunks first, then content chunks
+      const sseChunks = [
+        'data: {"choices":[{"delta":{"role":"assistant","reasoning_content":"Let me "}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"think about it."}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"function "}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"jump() "}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"{}"}}]}\n\n',
+        'data: [DONE]\n\n',
+      ];
+
+      const encoder = new TextEncoder();
+      const mockStream = new ReadableStream({
+        start(controller) {
+          for (const chunk of sseChunks) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        },
+      });
+
+      globalThis.fetch = (async () => {
+        return {
+          ok: true,
+          status: 200,
+          body: mockStream,
+        } as unknown as Response;
+      }) as unknown as typeof fetch;
+
+      const receivedTokens: string[] = [];
+      for await (const token of streamVLLM([{ role: "user", content: "Make jump" }])) {
+        receivedTokens.push(token);
+      }
+
+      // Must NOT contain reasoning tokens
+      assert.ok(!receivedTokens.some((t) => t.includes("think")));
+      assert.ok(!receivedTokens.some((t) => t.includes("Let me")));
+
+      // Must contain final response tokens
+      assert.deepEqual(receivedTokens, ["function ", "jump() ", "{}"]);
+    });
+
+    it("falls back to reasoning tokens if content was completely empty", async () => {
+      const sseChunks = [
+        'data: {"choices":[{"delta":{"reasoning_content":"Reasoning only fallback"}}]}\n\n',
+        'data: [DONE]\n\n',
+      ];
+
+      const encoder = new TextEncoder();
+      const mockStream = new ReadableStream({
+        start(controller) {
+          for (const chunk of sseChunks) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        },
+      });
+
+      globalThis.fetch = (async () => {
+        return {
+          ok: true,
+          status: 200,
+          body: mockStream,
+        } as unknown as Response;
+      }) as unknown as typeof fetch;
+
+      const receivedTokens: string[] = [];
+      for await (const token of streamVLLM([{ role: "user", content: "Help" }])) {
+        receivedTokens.push(token);
+      }
+
+      assert.deepEqual(receivedTokens, ["Reasoning only fallback"]);
+    });
+
+    it("yields offline fallback message on network error during streaming", async () => {
+      globalThis.fetch = (async () => {
+        throw new Error("fetch failed: ECONNREFUSED 127.0.0.1:8000");
+      }) as unknown as typeof fetch;
+
+      const receivedTokens: string[] = [];
+      for await (const token of streamVLLM([{ role: "user", content: "Offline test" }])) {
+        receivedTokens.push(token);
+      }
+
+      const fullOutput = receivedTokens.join("");
+      assert.match(fullOutput, /vLLM Offline Mode/);
+      assert.match(fullOutput, /Offline test/);
     });
   });
 });
